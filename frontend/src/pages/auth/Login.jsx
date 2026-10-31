@@ -1,11 +1,14 @@
 import React, { useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { LogIn, Eye, EyeOff, Shield, Users, User, Check } from 'lucide-react';
+import { useTheme } from '../../context/ThemeContext';
+import { LogIn, Eye, EyeOff, Shield, Users, User, Sun, Moon } from 'lucide-react';
 import ErrorMessage from '../../components/common/ErrorMessage';
+import SpotlightCard from '../../components/common/SpotlightCard';
 
 export const Login = () => {
   const { login } = useAuth();
+  const { theme, toggleTheme, isDark } = useTheme();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -49,7 +52,6 @@ export const Login = () => {
     setLoading(false);
 
     if (result.success) {
-      // Backend FastAPI determines and verifies the actual user role
       const actualRole = (result.user?.role || selectedRole).toUpperCase();
       if (actualRole === 'CUSTOMER') {
         navigate('/my-dashboard', { replace: true });
@@ -68,20 +70,40 @@ export const Login = () => {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        backgroundColor: '#F5F6F8',
+        backgroundColor: 'var(--bg-app)',
         padding: '1.5rem',
+        position: 'relative',
+        transition: 'background-color 150ms ease',
       }}
     >
-      <div
-        className="card"
+      {/* Top Corner Quick Theme Switch */}
+      <button
+        type="button"
+        onClick={toggleTheme}
+        style={{
+          position: 'absolute',
+          top: '1.5rem',
+          right: '1.5rem',
+          background: 'var(--bg-surface)',
+          border: '1px solid var(--border-default)',
+          color: 'var(--text-main)',
+          padding: '8px',
+          borderRadius: '8px',
+          cursor: 'pointer',
+          display: 'flex',
+          alignItems: 'center',
+          boxShadow: 'var(--shadow-sm)',
+        }}
+        title={`Switch to ${isDark ? 'Light' : 'Dark'} Mode`}
+      >
+        {isDark ? <Sun size={18} /> : <Moon size={18} />}
+      </button>
+
+      <SpotlightCard
         style={{
           width: '100%',
           maxWidth: '460px',
           padding: '2.25rem',
-          backgroundColor: '#FFFFFF',
-          borderRadius: '12px',
-          border: '1px solid #EAECF0',
-          boxShadow: '0 8px 24px rgba(16, 24, 40, 0.06)',
         }}
       >
         {/* Revora Logo & Title */}
@@ -104,17 +126,17 @@ export const Login = () => {
           >
             R
           </div>
-          <h1 style={{ fontSize: '1.5rem', fontWeight: 700, color: '#20242D', margin: 0, letterSpacing: '-0.02em' }}>
+          <h1 style={{ fontSize: '1.5rem', fontWeight: 700, color: 'var(--text-main)', margin: 0, letterSpacing: '-0.02em' }}>
             Revora
           </h1>
-          <p style={{ fontSize: '0.8125rem', color: '#87909E', marginTop: '4px' }}>
+          <p style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)', marginTop: '4px' }}>
             Subscription & Python Course Management
           </p>
         </div>
 
         {/* Role Selector Tabs (3 Roles) */}
         <div style={{ marginBottom: '1.5rem' }}>
-          <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: '#4B5563', marginBottom: '0.5rem', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+          <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '0.5rem', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
             Select Account Role
           </label>
           <div
@@ -122,9 +144,10 @@ export const Login = () => {
               display: 'grid',
               gridTemplateColumns: 'repeat(3, 1fr)',
               gap: '6px',
-              backgroundColor: '#F3F4F6',
+              backgroundColor: 'var(--bg-surface-alt)',
               padding: '4px',
               borderRadius: '8px',
+              border: '1px solid var(--border-default)',
             }}
           >
             <button
@@ -141,9 +164,9 @@ export const Login = () => {
                 cursor: 'pointer',
                 fontSize: '0.75rem',
                 fontWeight: selectedRole === 'ADMIN' ? 600 : 500,
-                backgroundColor: selectedRole === 'ADMIN' ? '#FFFFFF' : 'transparent',
-                color: selectedRole === 'ADMIN' ? '#7952CC' : '#6B7280',
-                boxShadow: selectedRole === 'ADMIN' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+                backgroundColor: selectedRole === 'ADMIN' ? 'var(--bg-surface)' : 'transparent',
+                color: selectedRole === 'ADMIN' ? 'var(--primary)' : 'var(--text-secondary)',
+                boxShadow: selectedRole === 'ADMIN' ? 'var(--shadow-sm)' : 'none',
                 transition: 'all 150ms ease',
               }}
             >
@@ -165,9 +188,9 @@ export const Login = () => {
                 cursor: 'pointer',
                 fontSize: '0.75rem',
                 fontWeight: selectedRole === 'STAFF' ? 600 : 500,
-                backgroundColor: selectedRole === 'STAFF' ? '#FFFFFF' : 'transparent',
-                color: selectedRole === 'STAFF' ? '#7952CC' : '#6B7280',
-                boxShadow: selectedRole === 'STAFF' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+                backgroundColor: selectedRole === 'STAFF' ? 'var(--bg-surface)' : 'transparent',
+                color: selectedRole === 'STAFF' ? 'var(--primary)' : 'var(--text-secondary)',
+                boxShadow: selectedRole === 'STAFF' ? 'var(--shadow-sm)' : 'none',
                 transition: 'all 150ms ease',
               }}
             >
@@ -189,9 +212,9 @@ export const Login = () => {
                 cursor: 'pointer',
                 fontSize: '0.75rem',
                 fontWeight: selectedRole === 'CUSTOMER' ? 600 : 500,
-                backgroundColor: selectedRole === 'CUSTOMER' ? '#FFFFFF' : 'transparent',
-                color: selectedRole === 'CUSTOMER' ? '#7952CC' : '#6B7280',
-                boxShadow: selectedRole === 'CUSTOMER' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+                backgroundColor: selectedRole === 'CUSTOMER' ? 'var(--bg-surface)' : 'transparent',
+                color: selectedRole === 'CUSTOMER' ? 'var(--primary)' : 'var(--text-secondary)',
+                boxShadow: selectedRole === 'CUSTOMER' ? 'var(--shadow-sm)' : 'none',
                 transition: 'all 150ms ease',
               }}
             >
@@ -219,7 +242,7 @@ export const Login = () => {
         <form onSubmit={handleSubmit}>
           {/* Email */}
           <div className="form-group" style={{ marginBottom: '1rem' }}>
-            <label className="form-label" style={{ fontWeight: 500, color: '#374151', fontSize: '0.8125rem' }}>
+            <label className="form-label">
               Email Address
             </label>
             <input
@@ -230,18 +253,12 @@ export const Login = () => {
               placeholder="name@revora.io"
               required
               autoComplete="email"
-              style={{
-                padding: '0.6rem 0.85rem',
-                fontSize: '0.875rem',
-                borderRadius: '6px',
-                border: '1px solid #D1D5DB',
-              }}
             />
           </div>
 
           {/* Password with Show/Hide Toggle */}
           <div className="form-group" style={{ marginBottom: '1rem' }}>
-            <label className="form-label" style={{ fontWeight: 500, color: '#374151', fontSize: '0.8125rem' }}>
+            <label className="form-label">
               Password
             </label>
             <div style={{ position: 'relative' }}>
@@ -253,13 +270,7 @@ export const Login = () => {
                 placeholder="••••••••"
                 required
                 autoComplete="current-password"
-                style={{
-                  padding: '0.6rem 2.5rem 0.6rem 0.85rem',
-                  fontSize: '0.875rem',
-                  borderRadius: '6px',
-                  border: '1px solid #D1D5DB',
-                  width: '100%',
-                }}
+                style={{ paddingRight: '2.5rem' }}
               />
               <button
                 type="button"
@@ -271,7 +282,7 @@ export const Login = () => {
                   transform: 'translateY(-50%)',
                   background: 'none',
                   border: 'none',
-                  color: '#9CA3AF',
+                  color: 'var(--text-muted)',
                   cursor: 'pointer',
                   padding: '4px',
                   display: 'flex',
@@ -299,7 +310,7 @@ export const Login = () => {
                 display: 'flex',
                 alignItems: 'center',
                 gap: '6px',
-                color: '#4B5563',
+                color: 'var(--text-secondary)',
                 cursor: 'pointer',
                 userSelect: 'none',
               }}
@@ -315,7 +326,7 @@ export const Login = () => {
 
             <Link
               to="/forgot-password"
-              style={{ color: '#7952CC', fontWeight: 500, textDecoration: 'none' }}
+              style={{ color: 'var(--primary)', fontWeight: 500, textDecoration: 'none' }}
             >
               Forgot password?
             </Link>
@@ -328,14 +339,9 @@ export const Login = () => {
             className="btn btn-primary"
             style={{
               width: '100%',
-              backgroundColor: '#7952CC',
-              color: '#FFFFFF',
               padding: '0.65rem 1rem',
-              borderRadius: '6px',
               fontWeight: 600,
               fontSize: '0.875rem',
-              boxShadow: '0 2px 6px rgba(121, 82, 204, 0.3)',
-              cursor: loading ? 'not-allowed' : 'pointer',
             }}
           >
             <LogIn size={16} />
@@ -349,16 +355,16 @@ export const Login = () => {
             textAlign: 'center',
             marginTop: '1.5rem',
             paddingTop: '1rem',
-            borderTop: '1px solid #EAECF0',
+            borderTop: '1px solid var(--border-default)',
             fontSize: '0.8125rem',
           }}
         >
-          <span style={{ color: '#87909E' }}>New student or enterprise customer? </span>
-          <Link to="/register" style={{ fontWeight: 600, color: '#7952CC', textDecoration: 'none' }}>
+          <span style={{ color: 'var(--text-secondary)' }}>New student or enterprise customer? </span>
+          <Link to="/register" style={{ fontWeight: 600, color: 'var(--primary)', textDecoration: 'none' }}>
             Register here
           </Link>
         </div>
-      </div>
+      </SpotlightCard>
     </div>
   );
 };
