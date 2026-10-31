@@ -1,31 +1,77 @@
 import React from 'react';
-import { Menu, Bell, User, Shield, HelpCircle } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import {
+  Menu,
+  Shield,
+  Sun,
+  Moon,
+  ChevronDown,
+  LogOut,
+  Settings,
+  UserCircle,
+} from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import { useTheme } from '../../context/ThemeContext';
+import Dropdown from '../common/Dropdown';
+import RevoraLogo from '../common/RevoraLogo';
 
 export const Navbar = ({ onToggleSidebar }) => {
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
+  const { theme, toggleTheme, isDark } = useTheme();
+  const navigate = useNavigate();
+
   const role = (user?.role || 'Customer').toUpperCase();
 
   const getRoleBadgeStyle = (r) => {
     switch (r) {
       case 'ADMIN':
-        return { bg: '#F3E8FF', text: '#7952CC', border: '#D8B4FE' };
+        return { bg: 'var(--primary-subtle)', text: 'var(--primary)', border: 'var(--primary-border)' };
       case 'STAFF':
-        return { bg: '#EFF6FF', text: '#2563EB', border: '#BFDBFE' };
+        return { bg: 'var(--status-info-bg)', text: 'var(--status-info-text)', border: 'var(--status-info-border)' };
       case 'CUSTOMER':
       default:
-        return { bg: '#ECFDF5', text: '#16A36A', border: '#A7F3D0' };
+        return { bg: 'var(--status-success-bg)', text: 'var(--status-success-text)', border: 'var(--status-success-border)' };
     }
   };
 
   const badge = getRoleBadgeStyle(role);
 
+  const userMenuItems = [
+    {
+      id: 'profile',
+      label: 'My Profile',
+      icon: UserCircle,
+      onClick: () => navigate(role === 'CUSTOMER' ? '/profile' : '/settings'),
+    },
+    {
+      id: 'settings',
+      label: 'System Settings',
+      icon: Settings,
+      onClick: () => navigate('/settings'),
+    },
+    { divider: true },
+    {
+      id: 'theme',
+      label: isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode',
+      icon: isDark ? Sun : Moon,
+      onClick: toggleTheme,
+    },
+    { divider: true },
+    {
+      id: 'logout',
+      label: 'Sign Out',
+      icon: LogOut,
+      danger: true,
+      onClick: logout,
+    },
+  ];
+
   return (
     <header
       style={{
-        height: '60px',
-        backgroundColor: '#FFFFFF',
-        borderBottom: '1px solid #EAECF0',
+        height: 'var(--navbar-height)',
+        backgroundColor: 'var(--navbar-bg)',
+        borderBottom: '1px solid var(--border-default)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
@@ -33,9 +79,10 @@ export const Navbar = ({ onToggleSidebar }) => {
         position: 'sticky',
         top: 0,
         zIndex: 30,
+        transition: 'background-color 150ms ease, border-color 150ms ease',
       }}
     >
-      <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
         {onToggleSidebar && (
           <button
             type="button"
@@ -43,28 +90,34 @@ export const Navbar = ({ onToggleSidebar }) => {
             style={{
               display: 'none',
               background: 'none',
-              border: 'none',
+              border: '1px solid var(--border-default)',
+              borderRadius: '6px',
               cursor: 'pointer',
-              color: '#4B5563',
-              padding: '4px',
+              color: 'var(--text-main)',
+              padding: '6px',
+              alignItems: 'center',
+              justifyContent: 'center',
             }}
             className="mobile-sidebar-toggle"
+            title="Toggle Menu"
           >
-            <Menu size={20} />
+            <Menu size={18} />
           </button>
         )}
+
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <span style={{ fontSize: '0.875rem', fontWeight: 600, color: '#111827' }}>
-            Brightloop Platform
+          <RevoraLogo size={22} />
+          <span style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--text-main)' }}>
+            Revora Platform
           </span>
-          <span style={{ color: '#D1D5DB' }}>/</span>
-          <span style={{ fontSize: '0.8125rem', color: '#6B7280' }}>
-            Python Masterclass Billing
+          <span style={{ color: 'var(--border-strong)' }}>/</span>
+          <span style={{ fontSize: '0.8125rem', color: 'var(--text-muted)' }}>
+            Subscription & Masterclass Billing
           </span>
         </div>
       </div>
 
-      <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
         {/* Role Pill */}
         <div
           style={{
@@ -86,63 +139,81 @@ export const Navbar = ({ onToggleSidebar }) => {
           <span>{role}</span>
         </div>
 
-        {/* Notifications Icon */}
+        {/* Theme Quick Toggle Icon */}
         <button
           type="button"
+          onClick={toggleTheme}
           style={{
             background: 'none',
             border: 'none',
-            color: '#6B7280',
+            color: 'var(--text-secondary)',
             cursor: 'pointer',
             padding: '6px',
             borderRadius: '6px',
             display: 'flex',
             alignItems: 'center',
-            position: 'relative',
           }}
-          title="Notifications"
+          title={isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
         >
-          <Bell size={18} />
-          <span
-            style={{
-              position: 'absolute',
-              top: '5px',
-              right: '5px',
-              width: '7px',
-              height: '7px',
-              borderRadius: '50%',
-              backgroundColor: '#7952CC',
-            }}
-          />
+          {isDark ? <Sun size={17} /> : <Moon size={17} />}
         </button>
 
-        {/* User initials & name */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', paddingLeft: '8px', borderLeft: '1px solid #EAECF0' }}>
-          <div
-            style={{
-              width: '32px',
-              height: '32px',
-              borderRadius: '50%',
-              backgroundColor: '#F3E8FF',
-              color: '#7952CC',
-              fontWeight: 700,
-              fontSize: '0.8125rem',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
-          >
-            {(user?.full_name || user?.email || 'U').charAt(0).toUpperCase()}
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column' }}>
-            <span style={{ fontSize: '0.8125rem', fontWeight: 600, color: '#111827', lineHeight: 1.2 }}>
-              {user?.full_name || user?.email?.split('@')[0] || 'User'}
-            </span>
-            <span style={{ fontSize: '0.7rem', color: '#9CA3AF' }}>
-              {user?.email || 'user@revora.io'}
-            </span>
-          </div>
-        </div>
+        {/* User Profile Dropdown Menu */}
+        <Dropdown
+          items={userMenuItems}
+          align="right"
+          width="210px"
+          trigger={
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                paddingLeft: '8px',
+                borderLeft: '1px solid var(--border-default)',
+                cursor: 'pointer',
+                userSelect: 'none',
+              }}
+            >
+              <div
+                style={{
+                  width: '32px',
+                  height: '32px',
+                  borderRadius: '50%',
+                  backgroundColor: 'var(--primary-subtle)',
+                  color: 'var(--primary)',
+                  fontWeight: 700,
+                  fontSize: '0.8125rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                {(user?.full_name || user?.email || 'U').charAt(0).toUpperCase()}
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', textAlign: 'left' }}>
+                <span
+                  style={{
+                    fontSize: '0.8125rem',
+                    fontWeight: 600,
+                    color: 'var(--text-main)',
+                    lineHeight: 1.2,
+                    maxWidth: '120px',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  {user?.full_name || user?.email?.split('@')[0] || 'User'}
+                </span>
+                <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+                  {role}
+                </span>
+              </div>
+              <ChevronDown size={14} color="var(--text-muted)" />
+            </div>
+          }
+        />
       </div>
     </header>
   );

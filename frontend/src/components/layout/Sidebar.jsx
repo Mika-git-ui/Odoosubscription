@@ -21,8 +21,13 @@ import {
   LogOut,
   Sun,
   Moon,
+  ChevronLeft,
+  ChevronRight,
+  X,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import { useTheme } from '../../context/ThemeContext';
+import RevoraLogo from '../common/RevoraLogo';
 
 const NAV_CONFIG = {
   ADMIN: [
@@ -61,262 +66,427 @@ const NAV_CONFIG = {
   ],
 };
 
-export const Sidebar = ({ isOpen = true, onClose }) => {
+export const Sidebar = ({
+  isOpen = false,
+  onClose,
+  isCollapsed = false,
+  onToggleCollapse,
+}) => {
   const { user, logout } = useAuth();
+  const { theme, toggleTheme, isDark } = useTheme();
   const currentRole = (user?.role || 'CUSTOMER').toUpperCase();
   const navItems = NAV_CONFIG[currentRole] || NAV_CONFIG.CUSTOMER;
 
   const [searchTerm, setSearchTerm] = useState('');
-  const [isDarkMode, setIsDarkMode] = useState(false);
 
   const filteredItems = navItems.filter((item) =>
     item.label.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   return (
-    <aside
-      style={{
-        width: '240px',
-        backgroundColor: '#111827',
-        color: '#9CA3AF',
-        display: 'flex',
-        flexDirection: 'column',
-        height: '100vh',
-        position: 'sticky',
-        top: 0,
-        zIndex: 40,
-        flexShrink: 0,
-        borderRight: '1px solid #1F2937',
-      }}
-    >
-      {/* Brand Header */}
-      <div
-        style={{
-          padding: '1.25rem 1.25rem 1rem',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '10px',
-        }}
-      >
+    <>
+      {/* Mobile Backdrop */}
+      {isOpen && (
         <div
-          style={{
-            width: '32px',
-            height: '32px',
-            borderRadius: '8px',
-            background: 'linear-gradient(135deg, #7952CC 0%, #9F7AEA 100%)',
-            color: '#FFFFFF',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            fontWeight: 800,
-            fontSize: '1rem',
-            boxShadow: '0 2px 8px rgba(121, 82, 204, 0.4)',
-          }}
-        >
-          R
-        </div>
-        <div>
-          <h2 style={{ fontSize: '1rem', fontWeight: 700, color: '#FFFFFF', margin: 0, letterSpacing: '-0.01em' }}>
-            Revora
-          </h2>
-          <span style={{ fontSize: '10px', color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-            {currentRole} WORKSPACE
-          </span>
-        </div>
-      </div>
+          className="sidebar-backdrop"
+          onClick={onClose}
+          style={{ display: isOpen ? 'block' : 'none' }}
+        />
+      )}
 
-      {/* Sidebar Search Bar matching Reference Screenshot */}
-      <div style={{ padding: '0 1rem 0.75rem' }}>
-        <div
-          style={{
-            position: 'relative',
-            display: 'flex',
-            alignItems: 'center',
-            backgroundColor: '#1F2937',
-            borderRadius: '6px',
-            padding: '0.4rem 0.65rem',
-            border: '1px solid #374151',
-          }}
-        >
-          <Search size={14} color="#6B7280" style={{ marginRight: '6px', flexShrink: 0 }} />
-          <input
-            type="text"
-            placeholder="Search"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            style={{
-              background: 'transparent',
-              border: 'none',
-              outline: 'none',
-              color: '#F3F4F6',
-              fontSize: '0.75rem',
-              width: '100%',
-            }}
-          />
-        </div>
-      </div>
-
-      {/* Navigation Items */}
-      <nav
+      <aside
+        className={`sidebar-wrapper sidebar-desktop ${isOpen ? 'sidebar-mobile-open' : ''}`}
         style={{
-          flex: 1,
-          overflowY: 'auto',
-          padding: '0.25rem 0.75rem',
+          width: isCollapsed ? '76px' : '250px',
+          backgroundColor: 'var(--sidebar-bg)',
+          color: 'var(--sidebar-text)',
           display: 'flex',
           flexDirection: 'column',
-          gap: '2px',
+          height: '100vh',
+          position: 'sticky',
+          top: 0,
+          zIndex: 40,
+          flexShrink: 0,
+          borderRight: '1px solid var(--sidebar-border)',
+          transition: 'width 200ms cubic-bezier(0.4, 0, 0.2, 1)',
         }}
       >
-        {filteredItems.map((item) => {
-          const Icon = item.icon;
-          return (
-            <NavLink
-              key={item.path}
-              to={item.path}
+        {/* Brand Header */}
+        <div
+          style={{
+            padding: isCollapsed ? '1rem 0.5rem' : '1.25rem 1.25rem 1rem',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: isCollapsed ? 'center' : 'space-between',
+            borderBottom: '1px solid rgba(255, 255, 255, 0.04)',
+            position: 'relative',
+          }}
+        >
+          {isCollapsed ? (
+            <div
+              style={{
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                gap: '8px',
+                width: '100%',
+              }}
+            >
+              <RevoraLogo size={34} />
+              <button
+                type="button"
+                onClick={onToggleCollapse}
+                title="Expand sidebar"
+                style={{
+                  background: 'rgba(255,255,255,0.06)',
+                  border: '1px solid rgba(255,255,255,0.1)',
+                  color: '#9CA3AF',
+                  cursor: 'pointer',
+                  padding: '4px',
+                  borderRadius: '6px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <ChevronRight size={14} />
+              </button>
+            </div>
+          ) : (
+            <>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <RevoraLogo size={34} />
+                <div>
+                  <h2
+                    style={{
+                      fontSize: '1.05rem',
+                      fontWeight: 700,
+                      color: '#FFFFFF',
+                      margin: 0,
+                      letterSpacing: '-0.02em',
+                    }}
+                  >
+                    Revora
+                  </h2>
+                  <span
+                    style={{
+                      fontSize: '9.5px',
+                      color: '#6B7280',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.06em',
+                      fontWeight: 600,
+                    }}
+                  >
+                    {currentRole} WORKSPACE
+                  </span>
+                </div>
+              </div>
+
+              {/* Desktop Minimize Toggle Button */}
+              <button
+                type="button"
+                onClick={onToggleCollapse}
+                title="Minimize sidebar"
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: '#6B7280',
+                  cursor: 'pointer',
+                  padding: '4px',
+                  borderRadius: '4px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <ChevronLeft size={16} />
+              </button>
+            </>
+          )}
+
+          {/* Mobile Close Button */}
+          {onClose && (
+            <button
+              type="button"
               onClick={onClose}
-              style={({ isActive }) => ({
+              style={{
+                background: 'none',
+                border: 'none',
+                color: '#9CA3AF',
+                cursor: 'pointer',
+                display: 'none',
+              }}
+              className="mobile-sidebar-toggle"
+            >
+              <X size={18} />
+            </button>
+          )}
+        </div>
+
+        {/* Search Bar matching Reference Screenshot (Hidden when collapsed) */}
+        {!isCollapsed && (
+          <div style={{ padding: '0.75rem 1rem 0.5rem' }}>
+            <div
+              style={{
+                position: 'relative',
                 display: 'flex',
                 alignItems: 'center',
-                gap: '10px',
-                padding: '0.55rem 0.75rem',
+                backgroundColor: 'var(--sidebar-search-bg)',
                 borderRadius: '6px',
-                fontSize: '0.8125rem',
-                fontWeight: isActive ? 600 : 500,
-                color: isActive ? '#FFFFFF' : '#9CA3AF',
-                backgroundColor: isActive ? '#1F2937' : 'transparent',
-                borderLeft: isActive ? '3px solid #7952CC' : '3px solid transparent',
-                transition: 'all 120ms ease-in-out',
-                textDecoration: 'none',
-              })}
+                padding: '0.4rem 0.65rem',
+                border: '1px solid #374151',
+              }}
             >
-              <Icon size={16} color="inherit" />
-              <span>{item.label}</span>
-            </NavLink>
-          );
-        })}
-      </nav>
+              <Search size={14} color="#6B7280" style={{ marginRight: '6px', flexShrink: 0 }} />
+              <input
+                type="text"
+                placeholder="Search"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  outline: 'none',
+                  color: '#F3F4F6',
+                  fontSize: '0.75rem',
+                  width: '100%',
+                }}
+              />
+            </div>
+          </div>
+        )}
 
-      {/* Bottom Area: Theme Pill Switcher & Sign Out */}
-      <div
-        style={{
-          padding: '0.85rem 1rem',
-          borderTop: '1px solid #1F2937',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '8px',
-        }}
-      >
-        {/* Light / Dark Mode Toggle Pill matching Reference Screenshot */}
-        <div
+        {/* Navigation Items (Properly centered & visible in both states) */}
+        <nav
           style={{
+            flex: 1,
+            overflowY: 'auto',
+            padding: isCollapsed ? '0.5rem 0.35rem' : '0.25rem 0.75rem',
             display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            backgroundColor: '#1F2937',
-            padding: '4px 8px',
-            borderRadius: '9999px',
-            fontSize: '0.75rem',
-            color: '#9CA3AF',
+            flexDirection: 'column',
+            gap: isCollapsed ? '4px' : '2px',
           }}
         >
-          <span style={{ fontSize: '11px', fontWeight: 500, color: !isDarkMode ? '#FFFFFF' : '#6B7280' }}>
-            Light
-          </span>
+          {filteredItems.map((item) => {
+            const Icon = item.icon;
+            return (
+              <NavLink
+                key={item.path}
+                to={item.path}
+                onClick={onClose}
+                title={item.label}
+                style={({ isActive }) => ({
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: isCollapsed ? 'center' : 'flex-start',
+                  gap: isCollapsed ? '0' : '10px',
+                  width: isCollapsed ? '46px' : 'auto',
+                  height: isCollapsed ? '44px' : 'auto',
+                  margin: isCollapsed ? '0 auto' : '0',
+                  padding: isCollapsed ? '0' : '0.55rem 0.75rem',
+                  borderRadius: isCollapsed ? '8px' : '6px',
+                  fontSize: '0.8125rem',
+                  fontWeight: isActive ? 600 : 500,
+                  color: isActive ? '#FFFFFF' : '#9CA3AF',
+                  backgroundColor: isActive
+                    ? isCollapsed
+                      ? 'rgba(121, 82, 204, 0.25)'
+                      : '#1F2937'
+                    : 'transparent',
+                  border:
+                    isActive && isCollapsed
+                      ? '1px solid rgba(121, 82, 204, 0.4)'
+                      : '1px solid transparent',
+                  borderLeft:
+                    isActive && !isCollapsed
+                      ? '3px solid #7952CC'
+                      : !isCollapsed
+                      ? '3px solid transparent'
+                      : 'none',
+                  transition: 'all 120ms ease-in-out',
+                  textDecoration: 'none',
+                })}
+              >
+                <Icon size={isCollapsed ? 20 : 17} color="inherit" style={{ flexShrink: 0 }} />
+                {!isCollapsed && (
+                  <span
+                    style={{
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    {item.label}
+                  </span>
+                )}
+              </NavLink>
+            );
+          })}
+        </nav>
+
+        {/* Bottom Area: Dynamic Light / Dark Mode Toggle Pill & Sign Out */}
+        <div
+          style={{
+            padding: isCollapsed ? '0.75rem 0.35rem' : '0.85rem 1rem',
+            borderTop: '1px solid #1F2937',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '8px',
+          }}
+        >
+          {/* Functional Light / Dark Mode Toggle Pill */}
           <div
-            onClick={() => setIsDarkMode(!isDarkMode)}
+            onClick={toggleTheme}
+            title={`Switch to ${isDark ? 'Light' : 'Dark'} Mode`}
             style={{
-              width: '36px',
-              height: '18px',
-              backgroundColor: '#374151',
-              borderRadius: '9999px',
-              position: 'relative',
-              cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
-              padding: '2px',
-            }}
-          >
-            <div
-              style={{
-                width: '14px',
-                height: '14px',
-                borderRadius: '50%',
-                backgroundColor: '#7952CC',
-                transform: isDarkMode ? 'translateX(18px)' : 'translateX(0)',
-                transition: 'transform 150ms ease',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
-            >
-              {isDarkMode ? <Moon size={8} color="#FFF" /> : <Sun size={8} color="#FFF" />}
-            </div>
-          </div>
-          <span style={{ fontSize: '11px', fontWeight: 500, color: isDarkMode ? '#FFFFFF' : '#6B7280' }}>
-            Dark
-          </span>
-        </div>
-
-        {/* User Profile & Sign Out */}
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            paddingTop: '4px',
-          }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden' }}>
-            <div
-              style={{
-                width: '26px',
-                height: '26px',
-                borderRadius: '50%',
-                backgroundColor: '#374151',
-                color: '#E5E7EB',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontSize: '11px',
-                fontWeight: 600,
-              }}
-            >
-              {(user?.full_name || user?.email || 'U').charAt(0).toUpperCase()}
-            </div>
-            <span
-              style={{
-                fontSize: '0.75rem',
-                color: '#E5E7EB',
-                fontWeight: 500,
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-                whiteSpace: 'nowrap',
-                maxWidth: '110px',
-              }}
-            >
-              {user?.full_name || user?.email || 'User'}
-            </span>
-          </div>
-
-          <button
-            type="button"
-            onClick={logout}
-            title="Sign out"
-            style={{
-              background: 'none',
-              border: 'none',
+              justifyContent: isCollapsed ? 'center' : 'space-between',
+              backgroundColor: '#1F2937',
+              padding: isCollapsed ? '6px' : '4px 8px',
+              borderRadius: '9999px',
+              fontSize: '0.75rem',
               color: '#9CA3AF',
               cursor: 'pointer',
-              padding: '4px',
-              display: 'flex',
-              alignItems: 'center',
+              userSelect: 'none',
+              transition: 'all 150ms ease',
             }}
           >
-            <LogOut size={15} />
-          </button>
+            {!isCollapsed && (
+              <span
+                style={{
+                  fontSize: '11px',
+                  fontWeight: 500,
+                  color: !isDark ? '#FFFFFF' : '#6B7280',
+                }}
+              >
+                Light
+              </span>
+            )}
+
+            <div
+              style={{
+                width: isCollapsed ? '28px' : '36px',
+                height: isCollapsed ? '28px' : '18px',
+                backgroundColor: '#374151',
+                borderRadius: '9999px',
+                position: 'relative',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                padding: '2px',
+              }}
+            >
+              <div
+                style={{
+                  width: isCollapsed ? '22px' : '14px',
+                  height: isCollapsed ? '22px' : '14px',
+                  borderRadius: '50%',
+                  backgroundColor: '#7952CC',
+                  transform:
+                    isCollapsed
+                      ? 'none'
+                      : isDark
+                      ? 'translateX(18px)'
+                      : 'translateX(0)',
+                  transition: 'transform 150ms ease',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                {isDark ? <Moon size={isCollapsed ? 12 : 8} color="#FFF" /> : <Sun size={isCollapsed ? 12 : 8} color="#FFF" />}
+              </div>
+            </div>
+
+            {!isCollapsed && (
+              <span
+                style={{
+                  fontSize: '11px',
+                  fontWeight: 500,
+                  color: isDark ? '#FFFFFF' : '#6B7280',
+                }}
+              >
+                Dark
+              </span>
+            )}
+          </div>
+
+          {/* User Profile & Sign Out */}
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: isCollapsed ? 'center' : 'space-between',
+              paddingTop: '4px',
+            }}
+          >
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                overflow: 'hidden',
+              }}
+              title={user?.full_name || user?.email || 'User'}
+            >
+              <div
+                style={{
+                  width: '32px',
+                  height: '32px',
+                  borderRadius: '50%',
+                  backgroundColor: '#374151',
+                  color: '#E5E7EB',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  flexShrink: 0,
+                }}
+              >
+                {(user?.full_name || user?.email || 'U').charAt(0).toUpperCase()}
+              </div>
+
+              {!isCollapsed && (
+                <span
+                  style={{
+                    fontSize: '0.75rem',
+                    color: '#E5E7EB',
+                    fontWeight: 500,
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                    maxWidth: '120px',
+                  }}
+                >
+                  {user?.full_name || user?.email?.split('@')[0] || 'User'}
+                </span>
+              )}
+            </div>
+
+            {!isCollapsed && (
+              <button
+                type="button"
+                onClick={logout}
+                title="Sign out"
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: '#9CA3AF',
+                  cursor: 'pointer',
+                  padding: '4px',
+                  display: 'flex',
+                  alignItems: 'center',
+                }}
+              >
+                <LogOut size={15} />
+              </button>
+            )}
+          </div>
         </div>
-      </div>
-    </aside>
+      </aside>
+    </>
   );
 };
 

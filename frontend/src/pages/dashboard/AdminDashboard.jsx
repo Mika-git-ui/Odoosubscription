@@ -10,15 +10,19 @@ import {
   Download,
   Trash2,
   ChevronDown,
-  TrendingUp,
   ArrowUpRight,
   ArrowDownRight,
   BookOpen,
+  FileSpreadsheet,
+  Printer,
+  RefreshCw,
 } from 'lucide-react';
 import CashFlowChart from '../../components/dashboard/CashFlowChart';
+import SpotlightCard from '../../components/common/SpotlightCard';
+import Dropdown from '../../components/common/Dropdown';
 import invoiceApi from '../../api/invoices';
-import reportApi from '../../api/reports';
-import { formatCurrency, formatDate } from '../../utils/formatters';
+import { formatCurrency } from '../../utils/formatters';
+import { downloadInvoice } from '../../utils/invoiceDownloader';
 
 export const AdminDashboard = () => {
   const navigate = useNavigate();
@@ -36,8 +40,8 @@ export const AdminDashboard = () => {
       customer_name: 'Robert Baratheon',
       status: 'PAID',
       status_label: 'Paid',
-      issue_date: '2026-05-30',
-      due_date: '2026-07-11',
+      issue_date: '5/30/26',
+      due_date: '7/11/26',
       total_amount: 928.41,
     },
     {
@@ -46,8 +50,8 @@ export const AdminDashboard = () => {
       customer_name: 'Arlene McCoy',
       status: 'OVERDUE',
       status_label: 'Overdue by 1 day',
-      issue_date: '2026-06-21',
-      due_date: '2026-09-23',
+      issue_date: '6/21/26',
+      due_date: '9/23/26',
       total_amount: 396.84,
     },
     {
@@ -56,8 +60,8 @@ export const AdminDashboard = () => {
       customer_name: 'Devon Lane',
       status: 'PENDING',
       status_label: 'Due in 14 days',
-      issue_date: '2026-07-11',
-      due_date: '2026-03-04',
+      issue_date: '7/11/26',
+      due_date: '3/4/26',
       total_amount: 490.51,
     },
     {
@@ -66,30 +70,29 @@ export const AdminDashboard = () => {
       customer_name: 'Ronald Richards',
       status: 'PARTIALLY_PAID',
       status_label: 'Partially Paid',
-      issue_date: '2026-04-21',
-      due_date: '2026-05-27',
+      issue_date: '4/21/26',
+      due_date: '5/27/26',
       total_amount: 601.13,
     },
   ];
 
-  useEffect(() => {
-    const fetchInvoices = async () => {
-      try {
-        setLoading(true);
-        const res = await invoiceApi.list({ limit: 10 });
-        if (res && res.data && res.data.length > 0) {
-          setInvoices(res.data);
-        } else {
-          setInvoices(initialInvoices);
-        }
-      } catch (err) {
-        // Fallback gracefully to reference preview data
+  const fetchInvoices = async () => {
+    try {
+      setLoading(true);
+      const res = await invoiceApi.list({ limit: 10 });
+      if (res && res.data && res.data.length > 0) {
+        setInvoices(res.data);
+      } else {
         setInvoices(initialInvoices);
-      } finally {
-        setLoading(false);
       }
-    };
+    } catch (err) {
+      setInvoices(initialInvoices);
+    } finally {
+      setLoading(false);
+    }
+  };
 
+  useEffect(() => {
     fetchInvoices();
   }, []);
 
@@ -112,7 +115,7 @@ export const AdminDashboard = () => {
       case 'PAID':
         return <span className="badge badge-paid">{label || 'Paid'}</span>;
       case 'OVERDUE':
-        return <span className="badge badge-overdue">{label || 'Overdue'}</span>;
+        return <span className="badge badge-overdue">{label || 'Overdue by 1 day'}</span>;
       case 'PENDING':
         return <span className="badge badge-pending">{label || 'Due in 14 days'}</span>;
       case 'PARTIALLY_PAID':
@@ -122,69 +125,82 @@ export const AdminDashboard = () => {
     }
   };
 
+  // Date Filter Dropdown Options
+  const dateRangeOptions = [
+    { id: 'today', label: 'Today', onClick: () => setDateRange('Today'), active: dateRange === 'Today' },
+    { id: 'week', label: 'Last 7 Days', onClick: () => setDateRange('Last 7 Days'), active: dateRange === 'Last 7 Days' },
+    { id: 'month', label: 'Last 30 Days', onClick: () => setDateRange('Last 30 Days'), active: dateRange === 'Last 30 Days' },
+    { id: 'quarter', label: 'This Quarter', onClick: () => setDateRange('This Quarter'), active: dateRange === 'This Quarter' },
+    { id: 'year', label: 'Year to Date', onClick: () => setDateRange('Year to Date'), active: dateRange === 'Year to Date' },
+  ];
+
+  // Cash Flow Menu Items
+  const cashFlowMenuItems = [
+    { id: 'export-csv', label: 'Export Cash Flow (CSV)', icon: FileSpreadsheet, onClick: () => alert('Exporting Cash Flow to CSV...') },
+    { id: 'print', label: 'Print Statement', icon: Printer, onClick: () => window.print() },
+    { divider: true },
+    { id: 'refresh', label: 'Refresh Analytics', icon: RefreshCw, onClick: () => fetchInvoices() },
+  ];
+
+  // Invoices Table Menu Items
+  const invoiceMenuItems = [
+    { id: 'export-invoices', label: 'Export All Invoices (CSV)', icon: FileSpreadsheet, onClick: () => alert('Exporting all invoices...') },
+    { id: 'print-table', label: 'Print Ledger', icon: Printer, onClick: () => window.print() },
+    { divider: true },
+    { id: 'refresh-inv', label: 'Refresh Table', icon: RefreshCw, onClick: () => fetchInvoices() },
+  ];
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
       {/* Top Header matching Reference Screenshot */}
       <div
         style={{
           display: 'flex',
+          flexWrap: 'wrap',
           alignItems: 'center',
           justifyContent: 'space-between',
+          gap: '1rem',
         }}
       >
-        <h1
-          style={{
-            fontSize: '1.5rem',
-            fontWeight: 700,
-            color: '#20242D',
-            margin: 0,
-            letterSpacing: '-0.02em',
-          }}
-        >
-          Invoice
-        </h1>
-
-        <div style={{ position: 'relative' }}>
-          <button
-            type="button"
+        <div>
+          <h1
             style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              backgroundColor: '#FFFFFF',
-              border: '1px solid #EAECF0',
-              borderRadius: '6px',
-              padding: '0.45rem 0.85rem',
-              fontSize: '0.8125rem',
-              fontWeight: 500,
-              color: '#374151',
-              cursor: 'pointer',
-              boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
+              fontSize: '1.5rem',
+              fontWeight: 700,
+              color: 'var(--text-main)',
+              margin: 0,
+              letterSpacing: '-0.02em',
             }}
           >
-            <span>{dateRange}</span>
-            <ChevronDown size={14} color="#6B7280" />
-          </button>
+            Invoice
+          </h1>
+          <p style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)', margin: '4px 0 0' }}>
+            Subscription receivables, cashflow analytics & Python learner invoices
+          </p>
         </div>
+
+        {/* Functional Date Range Dropdown */}
+        <Dropdown
+          trigger={
+            <button type="button" className="dropdown-trigger">
+              <span>{dateRange}</span>
+              <ChevronDown size={14} color="var(--text-secondary)" />
+            </button>
+          }
+          items={dateRangeOptions}
+          align="right"
+          width="170px"
+        />
       </div>
 
-      {/* 4 Metric Cards Strip matching Reference Screenshot */}
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(12, 1fr)',
-          gap: '1.25rem',
-        }}
-      >
+      {/* 4 Metric Cards Strip with Mouse Spotlight Tracking */}
+      <div className="metrics-grid">
         {/* Card 1: Total Invoices */}
-        <div
-          className="metric-card"
-          style={{ gridColumn: 'span 3', minHeight: '124px' }}
-        >
+        <SpotlightCard className="metric-card" style={{ minHeight: '124px' }}>
           <div className="metric-header">
             <div
               className="metric-icon-circle"
-              style={{ backgroundColor: '#F3E8FF', color: '#7952CC' }}
+              style={{ backgroundColor: 'var(--primary-subtle)', color: 'var(--primary)' }}
             >
               <FileText size={15} />
             </div>
@@ -195,17 +211,14 @@ export const AdminDashboard = () => {
             <ArrowUpRight size={13} />
             <span>+1.50 /month</span>
           </div>
-        </div>
+        </SpotlightCard>
 
         {/* Card 2: Paid Invoices */}
-        <div
-          className="metric-card"
-          style={{ gridColumn: 'span 3', minHeight: '124px' }}
-        >
+        <SpotlightCard className="metric-card" style={{ minHeight: '124px' }}>
           <div className="metric-header">
             <div
               className="metric-icon-circle"
-              style={{ backgroundColor: '#ECFDF5', color: '#16A36A' }}
+              style={{ backgroundColor: 'var(--status-success-bg)', color: 'var(--status-success-text)' }}
             >
               <CheckCircle2 size={15} />
             </div>
@@ -216,17 +229,14 @@ export const AdminDashboard = () => {
             <ArrowDownRight size={13} />
             <span>+0.47 /month</span>
           </div>
-        </div>
+        </SpotlightCard>
 
         {/* Card 3: Pending Invoices */}
-        <div
-          className="metric-card"
-          style={{ gridColumn: 'span 3', minHeight: '124px' }}
-        >
+        <SpotlightCard className="metric-card" style={{ minHeight: '124px' }}>
           <div className="metric-header">
             <div
               className="metric-icon-circle"
-              style={{ backgroundColor: '#FFFBEB', color: '#E9A23B' }}
+              style={{ backgroundColor: 'var(--status-warning-bg)', color: 'var(--status-warning-text)' }}
             >
               <Clock size={15} />
             </div>
@@ -237,22 +247,19 @@ export const AdminDashboard = () => {
             <ArrowUpRight size={13} />
             <span>+0.75 /month</span>
           </div>
-        </div>
+        </SpotlightCard>
 
         {/* Card 4: Total Receivables with Progress Bar */}
-        <div
-          className="metric-card"
-          style={{ gridColumn: 'span 3', minHeight: '124px', justifyContent: 'center' }}
-        >
+        <SpotlightCard className="metric-card" style={{ minHeight: '124px', justifyContent: 'center' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-              <span style={{ fontSize: '0.8125rem', fontWeight: 600, color: '#20242D' }}>
+              <span style={{ fontSize: '0.8125rem', fontWeight: 600, color: 'var(--text-main)' }}>
                 Total Receivables
               </span>
-              <Info size={13} color="#9CA3AF" />
+              <Info size={13} color="var(--text-muted)" />
             </div>
           </div>
-          <span style={{ fontSize: '0.75rem', color: '#87909E', marginTop: '2px' }}>
+          <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '2px' }}>
             Total Unpaid Invoices ₹43,078
           </span>
 
@@ -263,36 +270,28 @@ export const AdminDashboard = () => {
 
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div>
-              <span style={{ fontSize: '0.65rem', color: '#87909E', textTransform: 'uppercase', letterSpacing: '0.04em', fontWeight: 600 }}>
+              <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em', fontWeight: 600 }}>
                 CURRENT
               </span>
-              <div style={{ fontSize: '0.875rem', fontWeight: 700, color: '#20242D' }}>
+              <div style={{ fontSize: '0.875rem', fontWeight: 700, color: 'var(--text-main)' }}>
                 ₹109.1k
               </div>
             </div>
             <div style={{ textAlign: 'right' }}>
-              <span style={{ fontSize: '0.65rem', color: '#87909E', textTransform: 'uppercase', letterSpacing: '0.04em', fontWeight: 600 }}>
+              <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em', fontWeight: 600 }}>
                 OVERDUE
               </span>
-              <div style={{ fontSize: '0.875rem', fontWeight: 700, color: '#20242D' }}>
+              <div style={{ fontSize: '0.875rem', fontWeight: 700, color: 'var(--text-main)' }}>
                 ₹65k
               </div>
             </div>
           </div>
-        </div>
+        </SpotlightCard>
       </div>
 
-      {/* Middle Cash Flow Area Section */}
-      <div
-        className="card"
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(12, 1fr)',
-          gap: '1.5rem',
-          padding: '1.25rem 1.5rem',
-        }}
-      >
-        <div style={{ gridColumn: 'span 9' }}>
+      {/* Middle Cash Flow Area Section with Spotlight */}
+      <SpotlightCard className="cashflow-grid" style={{ padding: '1.25rem 1.5rem' }}>
+        <div>
           <div
             style={{
               display: 'flex',
@@ -302,32 +301,43 @@ export const AdminDashboard = () => {
             }}
           >
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <h2 style={{ fontSize: '1rem', fontWeight: 600, color: '#20242D', margin: 0 }}>
+              <h2 style={{ fontSize: '1rem', fontWeight: 600, color: 'var(--text-main)', margin: 0 }}>
                 Cash Flow
               </h2>
-              <Info size={14} color="#9CA3AF" />
+              <Info size={14} color="var(--text-muted)" />
             </div>
+
+            <Dropdown
+              trigger={
+                <button type="button" className="btn-icon" title="Cash flow actions">
+                  <MoreHorizontal size={16} />
+                </button>
+              }
+              items={cashFlowMenuItems}
+              align="right"
+              width="210px"
+            />
           </div>
           <CashFlowChart />
         </div>
 
         {/* Right Metric Stack inside Cash Flow Card */}
         <div
+          className="cashflow-stats"
           style={{
-            gridColumn: 'span 3',
             display: 'flex',
             flexDirection: 'column',
             justifyContent: 'center',
             paddingLeft: '1.5rem',
-            borderLeft: '1px solid #EAECF0',
+            borderLeft: '1px solid var(--border-default)',
             gap: '1.5rem',
           }}
         >
           <div>
-            <span style={{ fontSize: '0.75rem', color: '#87909E' }}>
+            <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
               Cash as on 04/01/2026
             </span>
-            <div style={{ fontSize: '1.625rem', fontWeight: 700, color: '#20242D', marginTop: '4px' }}>
+            <div style={{ fontSize: '1.625rem', fontWeight: 700, color: 'var(--text-main)', marginTop: '4px' }}>
               ₹691.9k
             </div>
           </div>
@@ -336,7 +346,7 @@ export const AdminDashboard = () => {
             <span style={{ fontSize: '0.75rem', color: '#16A36A', fontWeight: 500 }}>
               Incoming
             </span>
-            <div style={{ fontSize: '1.5rem', fontWeight: 700, color: '#20242D', marginTop: '2px' }}>
+            <div style={{ fontSize: '1.5rem', fontWeight: 700, color: 'var(--text-main)', marginTop: '2px' }}>
               ₹106.6k
             </div>
           </div>
@@ -345,12 +355,12 @@ export const AdminDashboard = () => {
             <span style={{ fontSize: '0.75rem', color: '#E05252', fontWeight: 500 }}>
               Outgoing
             </span>
-            <div style={{ fontSize: '1.5rem', fontWeight: 700, color: '#20242D', marginTop: '2px' }}>
+            <div style={{ fontSize: '1.5rem', fontWeight: 700, color: 'var(--text-main)', marginTop: '2px' }}>
               ₹798.5k
             </div>
           </div>
         </div>
-      </div>
+      </SpotlightCard>
 
       {/* Bottom Section: All Invoices Table matching Reference Screenshot */}
       <div className="card" style={{ padding: 0 }}>
@@ -361,14 +371,14 @@ export const AdminDashboard = () => {
             alignItems: 'center',
             justifyContent: 'space-between',
             padding: '1.25rem 1.5rem',
-            borderBottom: '1px solid #EAECF0',
+            borderBottom: '1px solid var(--border-default)',
           }}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <h2 style={{ fontSize: '1rem', fontWeight: 600, color: '#20242D', margin: 0 }}>
+            <h2 style={{ fontSize: '1rem', fontWeight: 600, color: 'var(--text-main)', margin: 0 }}>
               All Invoices
             </h2>
-            <Info size={14} color="#9CA3AF" />
+            <Info size={14} color="var(--text-muted)" />
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
@@ -377,35 +387,26 @@ export const AdminDashboard = () => {
               className="btn btn-primary"
               onClick={() => navigate('/invoices')}
               style={{
-                backgroundColor: '#7952CC',
-                color: '#FFFFFF',
                 borderRadius: '6px',
                 padding: '0.45rem 0.95rem',
                 fontSize: '0.8125rem',
                 fontWeight: 600,
-                boxShadow: '0 2px 4px rgba(121, 82, 204, 0.25)',
               }}
             >
               <Plus size={15} />
-              <span>+ New Invoice</span>
+              <span>New Invoice</span>
             </button>
 
-            <button
-              type="button"
-              style={{
-                background: 'none',
-                border: '1px solid #EAECF0',
-                borderRadius: '6px',
-                padding: '0.45rem',
-                cursor: 'pointer',
-                color: '#6B7280',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
-            >
-              <MoreHorizontal size={16} />
-            </button>
+            <Dropdown
+              trigger={
+                <button type="button" className="btn-icon" title="Table options">
+                  <MoreHorizontal size={16} />
+                </button>
+              }
+              items={invoiceMenuItems}
+              align="right"
+              width="210px"
+            />
           </div>
         </div>
 
@@ -453,17 +454,17 @@ export const AdminDashboard = () => {
                       {inv.invoice_number || inv.id}
                     </span>
                   </td>
-                  <td style={{ fontWeight: 500 }}>
+                  <td style={{ fontWeight: 500, color: 'var(--text-main)' }}>
                     {inv.customer_name || 'Student Account'}
                   </td>
                   <td>{getStatusBadge(inv.status, inv.status_label)}</td>
-                  <td style={{ color: '#6B7280' }}>
+                  <td style={{ color: 'var(--text-secondary)' }}>
                     {inv.issue_date || '5/30/26'}
                   </td>
-                  <td style={{ color: '#6B7280' }}>
+                  <td style={{ color: 'var(--text-secondary)' }}>
                     {inv.due_date || '7/11/26'}
                   </td>
-                  <td style={{ fontWeight: 600 }}>
+                  <td style={{ fontWeight: 600, color: 'var(--text-main)' }}>
                     {formatCurrency(inv.total_amount || 0)}
                   </td>
                   <td style={{ textAlign: 'center' }}>
@@ -477,14 +478,15 @@ export const AdminDashboard = () => {
                     >
                       <button
                         type="button"
+                        onClick={() => downloadInvoice(inv)}
                         style={{
                           background: 'none',
                           border: 'none',
-                          color: '#6B7280',
+                          color: 'var(--primary)',
                           cursor: 'pointer',
                           padding: '4px',
                         }}
-                        title="Download Invoice PDF"
+                        title="Download Invoice PDF / Receipt"
                       >
                         <Download size={15} />
                       </button>
@@ -493,7 +495,7 @@ export const AdminDashboard = () => {
                         style={{
                           background: 'none',
                           border: 'none',
-                          color: '#9CA3AF',
+                          color: 'var(--text-muted)',
                           cursor: 'pointer',
                           padding: '4px',
                         }}
@@ -510,35 +512,30 @@ export const AdminDashboard = () => {
         </div>
       </div>
 
-      {/* Flagship Python Course Tiers Banner */}
-      <div
-        className="card"
-        style={{
-          border: '1px solid #EAECF0',
-          backgroundColor: '#FFFFFF',
-          padding: '1.25rem 1.5rem',
-        }}
-      >
+      {/* Flagship Python Course Tiers Banner with Spotlight */}
+      <SpotlightCard style={{ padding: '1.25rem 1.5rem' }}>
         <div
           style={{
             display: 'flex',
+            flexWrap: 'wrap',
             alignItems: 'center',
             justifyContent: 'space-between',
+            gap: '0.5rem',
             marginBottom: '1rem',
           }}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <BookOpen size={18} color="#7952CC" />
-            <h3 style={{ fontSize: '0.9375rem', fontWeight: 600, color: '#20242D', margin: 0 }}>
-              Brightloop Python Masterclass — Active Curriculum Tiers
+            <BookOpen size={18} color="var(--primary)" />
+            <h3 style={{ fontSize: '0.9375rem', fontWeight: 600, color: 'var(--text-main)', margin: 0 }}>
+              Revora Python Masterclass — Active Curriculum Tiers
             </h3>
           </div>
           <span
             style={{
               fontSize: '0.75rem',
               fontWeight: 600,
-              color: '#7952CC',
-              backgroundColor: '#F3E8FF',
+              color: 'var(--primary)',
+              backgroundColor: 'var(--primary-subtle)',
               padding: '2px 8px',
               borderRadius: '9999px',
             }}
@@ -547,32 +544,26 @@ export const AdminDashboard = () => {
           </span>
         </div>
 
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(3, 1fr)',
-            gap: '1rem',
-          }}
-        >
+        <div className="course-tiers-grid">
           {/* Basic */}
           <div
             style={{
               padding: '1rem',
               borderRadius: '8px',
-              border: '1px solid #EAECF0',
-              backgroundColor: '#FAFAFA',
+              border: '1px solid var(--border-default)',
+              backgroundColor: 'var(--bg-surface-alt)',
             }}
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span style={{ fontWeight: 600, fontSize: '0.875rem' }}>Basic Level</span>
-              <span style={{ fontWeight: 700, color: '#7952CC', fontSize: '0.875rem' }}>
+              <span style={{ fontWeight: 600, fontSize: '0.875rem', color: 'var(--text-main)' }}>Basic Level</span>
+              <span style={{ fontWeight: 700, color: 'var(--primary)', fontSize: '0.875rem' }}>
                 ₹999 / mo
               </span>
             </div>
-            <p style={{ fontSize: '0.75rem', color: '#6B7280', margin: '6px 0 10px' }}>
+            <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', margin: '6px 0 10px' }}>
               Core Syntax, Variables, Control Flow, Functions & OOP Basics.
             </p>
-            <div style={{ fontSize: '0.75rem', color: '#374151', fontWeight: 500 }}>
+            <div style={{ fontSize: '0.75rem', color: 'var(--text-main)', fontWeight: 500 }}>
               Enrolled: <strong className="num-tabular">12 Learners</strong>
             </div>
           </div>
@@ -582,20 +573,20 @@ export const AdminDashboard = () => {
             style={{
               padding: '1rem',
               borderRadius: '8px',
-              border: '1px solid #D8B4FE',
-              backgroundColor: '#FAF5FF',
+              border: '1px solid var(--primary-border)',
+              backgroundColor: 'var(--primary-subtle)',
             }}
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span style={{ fontWeight: 600, fontSize: '0.875rem' }}>Intermediate Level</span>
-              <span style={{ fontWeight: 700, color: '#7952CC', fontSize: '0.875rem' }}>
+              <span style={{ fontWeight: 600, fontSize: '0.875rem', color: 'var(--text-main)' }}>Intermediate Level</span>
+              <span style={{ fontWeight: 700, color: 'var(--primary)', fontSize: '0.875rem' }}>
                 ₹1,999 / mo
               </span>
             </div>
-            <p style={{ fontSize: '0.75rem', color: '#6B7280', margin: '6px 0 10px' }}>
+            <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', margin: '6px 0 10px' }}>
               Data Structures, Algorithms, FastAPI REST APIs & Async I/O (+₹1,000).
             </p>
-            <div style={{ fontSize: '0.75rem', color: '#374151', fontWeight: 500 }}>
+            <div style={{ fontSize: '0.75rem', color: 'var(--text-main)', fontWeight: 500 }}>
               Enrolled: <strong className="num-tabular">24 Learners</strong>
             </div>
           </div>
@@ -605,25 +596,25 @@ export const AdminDashboard = () => {
             style={{
               padding: '1rem',
               borderRadius: '8px',
-              border: '1px solid #EAECF0',
-              backgroundColor: '#FAFAFA',
+              border: '1px solid var(--border-default)',
+              backgroundColor: 'var(--bg-surface-alt)',
             }}
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span style={{ fontWeight: 600, fontSize: '0.875rem' }}>Advanced Level</span>
-              <span style={{ fontWeight: 700, color: '#7952CC', fontSize: '0.875rem' }}>
+              <span style={{ fontWeight: 600, fontSize: '0.875rem', color: 'var(--text-main)' }}>Advanced Level</span>
+              <span style={{ fontWeight: 700, color: 'var(--primary)', fontSize: '0.875rem' }}>
                 ₹3,499 / mo
               </span>
             </div>
-            <p style={{ fontSize: '0.75rem', color: '#6B7280', margin: '6px 0 10px' }}>
+            <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', margin: '6px 0 10px' }}>
               Distributed Systems, Concurrency, Performance Tuning & ML (+₹2,500).
             </p>
-            <div style={{ fontSize: '0.75rem', color: '#374151', fontWeight: 500 }}>
+            <div style={{ fontSize: '0.75rem', color: 'var(--text-main)', fontWeight: 500 }}>
               Enrolled: <strong className="num-tabular">8 Learners</strong>
             </div>
           </div>
         </div>
-      </div>
+      </SpotlightCard>
     </div>
   );
 };

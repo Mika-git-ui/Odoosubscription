@@ -94,7 +94,7 @@ export const CashFlowChart = ({ data = [] }) => {
                 y1={yPos}
                 x2={width - paddingRight}
                 y2={yPos}
-                stroke="#F3F4F6"
+                stroke="var(--border-default)"
                 strokeWidth="1"
               />
               <text

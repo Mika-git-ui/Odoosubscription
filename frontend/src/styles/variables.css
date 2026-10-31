@@ -1,6 +1,6 @@
 /* ==========================================================================
    REVORA DESIGN TOKENS & SYSTEM VARIABLES
-   Matches the Modern Dark-Sidebar SaaS Reference Exactly
+   Supports Light Mode (Reference SaaS) & Dark Mode with Smooth Transitions
    ========================================================================== */
 
 :root {
@@ -11,7 +11,7 @@
   --primary-subtle: #F3E8FF;
   --primary-border: #E9D5FF;
 
-  /* Surfaces & Backgrounds */
+  /* Surfaces & Backgrounds - Light Default */
   --sidebar-bg: #111827;
   --sidebar-search-bg: #1F2937;
   --sidebar-border: #1F2937;
@@ -24,6 +24,7 @@
   --bg-surface: #FFFFFF;
   --bg-surface-alt: #F9FAFB;
   --bg-surface-hover: #F8FAFC;
+  --navbar-bg: #FFFFFF;
 
   /* Text & Typography */
   --text-main: #20242D;
@@ -56,8 +57,9 @@
   /* Typography */
   --font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   --font-size-xs: 0.75rem;    /* 12px */
-  --font-size-sm: 0.875rem;   /* 14px */
-  --font-size-base: 1rem;     /* 16px */
+  --font-size-sm: 0.8125rem;  /* 13px */
+  --font-size-base: 0.875rem; /* 14px */
+  --font-size-md: 1rem;       /* 16px */
   --font-size-lg: 1.125rem;   /* 18px */
   --font-size-xl: 1.25rem;    /* 20px */
   --font-size-2xl: 1.5rem;    /* 24px */
@@ -83,8 +85,55 @@
   --shadow-sm: 0 1px 2px 0 rgba(16, 24, 40, 0.04);
   --shadow-md: 0 4px 8px -2px rgba(16, 24, 40, 0.08), 0 2px 4px -2px rgba(16, 24, 40, 0.04);
   --shadow-lg: 0 12px 16px -4px rgba(16, 24, 40, 0.08), 0 4px 6px -2px rgba(16, 24, 40, 0.03);
+  --glow-color: rgba(121, 82, 204, 0.12);
 
   /* Layout */
-  --sidebar-width: 240px;
-  --navbar-height: 64px;
+  --sidebar-width: 250px;
+  --sidebar-collapsed-width: 74px;
+  --navbar-height: 60px;
+}
+
+/* ==========================================================================
+   DARK MODE OVERRIDES
+   ========================================================================== */
+[data-theme='dark'] {
+  --bg-app: #0B0F19;
+  --bg-surface: #111827;
+  --bg-surface-alt: #1F2937;
+  --bg-surface-hover: #1E293B;
+  --navbar-bg: #111827;
+
+  --sidebar-bg: #090D16;
+  --sidebar-search-bg: #131B2E;
+  --sidebar-border: #1F2937;
+
+  --text-main: #F9FAFB;
+  --text-secondary: #9CA3AF;
+  --text-muted: #6B7280;
+
+  --border-subtle: #1F2937;
+  --border-default: #1F2937;
+  --border-strong: #374151;
+
+  --shadow-sm: 0 1px 3px 0 rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 4px 12px -2px rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 12px 24px -4px rgba(0, 0, 0, 0.5);
+
+  --glow-color: rgba(121, 82, 204, 0.22);
+
+  --status-success-bg: rgba(22, 163, 106, 0.15);
+  --status-success-text: #34D399;
+  --status-success-border: rgba(52, 211, 153, 0.25);
+
+  --status-warning-bg: rgba(233, 162, 59, 0.15);
+  --status-warning-text: #FBBF24;
+  --status-warning-border: rgba(251, 191, 36, 0.25);
+
+  --status-danger-bg: rgba(224, 82, 82, 0.15);
+  --status-danger-text: #F87171;
+  --status-danger-border: rgba(248, 113, 113, 0.25);
+
+  --status-info-bg: rgba(37, 99, 235, 0.15);
+  --status-info-text: #60A5FA;
+  --status-info-border: rgba(96, 165, 250, 0.25);
 }
