@@ -194,6 +194,8 @@ class Discount(Base):
     name = Column(String(150), nullable=False)
     discount_type = Column(String(20), nullable=False)
     value = Column(Numeric(12, 2), nullable=False)
+    applicable_to = Column(String(20), nullable=False, default="subscription")
+    product_id = Column(Integer, ForeignKey("products.id"), nullable=True)
     minimum_purchase = Column(Numeric(12, 2), default=0)
     minimum_quantity = Column(Integer, default=1)
     start_date = Column(Date)
@@ -201,6 +203,8 @@ class Discount(Base):
     maximum_uses = Column(Integer)
     current_uses = Column(Integer, default=0)
     is_active = Column(Boolean, default=True)
+
+    product = relationship("Product")
 
 
 class DiscountUsage(Base):
@@ -224,3 +228,56 @@ class Payment(Base):
     note = Column(Text)
 
     invoice = relationship("Invoice", back_populates="payments")
+
+
+class QuotationTemplate(Base):
+    __tablename__ = "quotation_templates"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(150), nullable=False)
+    description = Column(Text)
+    plan_id = Column(Integer, ForeignKey("plans.id"), nullable=False)
+    validity_days = Column(Integer, nullable=False, default=30)
+    is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime, server_default=func.now())
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+
+    plan = relationship("Plan")
+    lines = relationship(
+        "QuotationTemplateLine",
+        back_populates="template",
+        cascade="all, delete-orphan"
+    )
+
+
+class QuotationTemplateLine(Base):
+    __tablename__ = "quotation_template_lines"
+
+    id = Column(Integer, primary_key=True, index=True)
+    template_id = Column(
+        Integer, ForeignKey("quotation_templates.id"), nullable=False
+    )
+    product_id = Column(Integer, ForeignKey("products.id"), nullable=False)
+    variant_id = Column(Integer, ForeignKey("product_variants.id"))
+    quantity = Column(Integer, nullable=False, default=1)
+    unit_price = Column(Numeric(12, 2), nullable=False)
+    line_total = Column(Numeric(12, 2), nullable=False)
+
+    template = relationship("QuotationTemplate", back_populates="lines")
+    product = relationship("Product")
+    variant = relationship("ProductVariant")
+
+
+class PasswordResetToken(Base):
+    __tablename__ = "password_reset_tokens"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    token_hash = Column(String(255), nullable=False, index=True)
+    expires_at = Column(DateTime, nullable=False)
+    is_used = Column(Boolean, default=False)
+    used_at = Column(DateTime)
+    created_at = Column(DateTime, server_default=func.now())
+
+    user = relationship("User")
+

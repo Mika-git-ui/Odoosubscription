@@ -1,9 +1,8 @@
-
 from datetime import date
-from decimal import Decimal
+from decimal import Decimal, ROUND_HALF_UP
 
-from fastapi import APIRouter, Depends, Query
-from sqlalchemy import func
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy import func, case, and_
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -14,114 +13,103 @@ from app.models.entities import (
 )
 from app.routers.auth import require_roles
 
-
 router = APIRouter(prefix="/reports", tags=["Reports"])
+
+CENT = Decimal("0.01")
+ZERO = Decimal("0.00")
 
 
 def money(value):
-    return Decimal(str(value or 0)).quantize(Decimal("0.01"))
+    return Decimal(str(value or 0)).quantize(CENT, rounding=ROUND_HALF_UP)
 
 
-def get_invoice_payment_query(db, date_from=None, date_to=None):
-    paid_subquery = (
+def get_paid_subquery(db: Session):
+    return (
         db.query(
             Payment.invoice_id.label("invoice_id"),
-            func.sum(Payment.amount).label("paid_amount")
+            func.coalesce(func.sum(Payment.amount), 0).label("paid_amount")
         )
         .group_by(Payment.invoice_id)
         .subquery()
     )
 
-    query = (
-        db.query(
-            Invoice,
-            func.coalesce(
-                paid_subquery.c.paid_amount, 0
-            ).label("paid_amount")
-        )
-        .outerjoin(
-            paid_subquery,
-            Invoice.id == paid_subquery.c.invoice_id
-        )
-        .filter(Invoice.status == "confirmed")
-    )
-
-    if date_from:
-        query = query.filter(Invoice.issue_date >= date_from)
-
-    if date_to:
-        query = query.filter(Invoice.issue_date <= date_to)
-
-    return query
-
 
 # REPORT SUMMARY
-
 @router.get("/summary")
 def report_summary(
-    date_from: date | None = Query(default=None),
-    date_to: date | None = Query(default=None),
+    date_from: date | None = None,
+    date_to: date | None = None,
     db: Session = Depends(get_db),
     current_user=Depends(require_roles("admin", "staff"))
 ):
     if date_from and date_to and date_from > date_to:
-        from fastapi import HTTPException
-        raise HTTPException(400, "Start date cannot be after end date")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Start date cannot be after end date"
+        )
 
+    # 1. Active subscriptions count
     active_subscriptions = db.query(
         func.count(Subscription.id)
     ).filter(
         Subscription.status == "active"
     ).scalar() or 0
 
-    # Revenue is based on actual payments received.
+    # 2. Revenue received based on actual payments
     payment_query = db.query(
         func.coalesce(func.sum(Payment.amount), 0)
     )
-
     if date_from:
-        payment_query = payment_query.filter(
-            Payment.payment_date >= date_from
-        )
-
+        payment_query = payment_query.filter(Payment.payment_date >= date_from)
     if date_to:
-        payment_query = payment_query.filter(
-            Payment.payment_date <= date_to
-        )
+        payment_query = payment_query.filter(Payment.payment_date <= date_to)
 
     revenue_received = money(payment_query.scalar())
 
-    # Outstanding and overdue balances.
-    invoice_query = get_invoice_payment_query(
-        db, date_from, date_to
-    )
-
-    outstanding_amount = Decimal("0.00")
-    overdue_amount = Decimal("0.00")
-    overdue_count = 0
-    outstanding_count = 0
-
+    # 3. Database-level aggregation for outstanding & overdue invoices
+    paid_sub = get_paid_subquery(db)
+    balance_expr = Invoice.total_amount - func.coalesce(paid_sub.c.paid_amount, 0)
     today = date.today()
 
-    for invoice, paid_amount in invoice_query.all():
-        balance = money(invoice.total_amount - paid_amount)
+    agg_query = (
+        db.query(
+            func.coalesce(
+                func.sum(case((balance_expr > 0, balance_expr), else_=ZERO)),
+                ZERO
+            ).label("outstanding_amount"),
+            func.count(
+                case((balance_expr > 0, Invoice.id), else_=None)
+            ).label("outstanding_count"),
+            func.coalesce(
+                func.sum(case((and_(balance_expr > 0, Invoice.due_date < today), balance_expr), else_=ZERO)),
+                ZERO
+            ).label("overdue_amount"),
+            func.count(
+                case((and_(balance_expr > 0, Invoice.due_date < today), Invoice.id), else_=None)
+            ).label("overdue_count"),
+        )
+        .outerjoin(paid_sub, Invoice.id == paid_sub.c.invoice_id)
+        .filter(Invoice.status == "confirmed")
+    )
 
-        if balance <= 0:
-            continue
+    if date_from:
+        agg_query = agg_query.filter(Invoice.issue_date >= date_from)
+    if date_to:
+        agg_query = agg_query.filter(Invoice.issue_date <= date_to)
 
-        outstanding_amount += balance
-        outstanding_count += 1
+    agg_row = agg_query.first()
 
-        if invoice.due_date and invoice.due_date < today:
-            overdue_amount += balance
-            overdue_count += 1
+    outstanding_amount = money(agg_row.outstanding_amount) if agg_row else ZERO
+    outstanding_count = int(agg_row.outstanding_count or 0) if agg_row else 0
+    overdue_amount = money(agg_row.overdue_amount) if agg_row else ZERO
+    overdue_count = int(agg_row.overdue_count or 0) if agg_row else 0
 
     return {
         "active_subscriptions": active_subscriptions,
-        "revenue_received": str(money(revenue_received)),
-        "outstanding_amount": str(money(outstanding_amount)),
+        "revenue_received": str(revenue_received),
+        "outstanding_amount": str(outstanding_amount),
         "outstanding_invoice_count": outstanding_count,
-        "overdue_amount": str(money(overdue_amount)),
+        "overdue_amount": str(overdue_amount),
         "overdue_invoice_count": overdue_count,
         "date_from": str(date_from) if date_from else None,
         "date_to": str(date_to) if date_to else None,
@@ -129,53 +117,90 @@ def report_summary(
 
 
 # OVERDUE INVOICE REPORT
-
 @router.get("/overdue-invoices")
 def overdue_invoices(
-    date_from: date | None = Query(default=None),
-    date_to: date | None = Query(default=None),
-    skip: int = Query(default=0, ge=0),
-    limit: int = Query(default=50, ge=1, le=100),
+    date_from: date | None = None,
+    date_to: date | None = None,
+    skip: int = 0,
+    limit: int = 50,
     db: Session = Depends(get_db),
     current_user=Depends(require_roles("admin", "staff"))
 ):
     if date_from and date_to and date_from > date_to:
-        from fastapi import HTTPException
-        raise HTTPException(400, "Start date cannot be after end date")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Start date cannot be after end date"
+        )
 
-    query = get_invoice_payment_query(db, date_from, date_to)
+    paid_sub = get_paid_subquery(db)
+    balance_expr = Invoice.total_amount - func.coalesce(paid_sub.c.paid_amount, 0)
+    today = date.today()
 
-    query = query.filter(
-        Invoice.due_date < date.today()
-    ).order_by(Invoice.due_date.asc())
+    # Base filter conditions
+    base_filters = [
+        Invoice.status == "confirmed",
+        Invoice.due_date < today,
+        balance_expr > 0
+    ]
+    if date_from:
+        base_filters.append(Invoice.issue_date >= date_from)
+    if date_to:
+        base_filters.append(Invoice.issue_date <= date_to)
 
-    results = []
-    total_overdue = Decimal("0.00")
+    # 1. Total overdue amount & count calculated entirely in the DB
+    totals_query = (
+        db.query(
+            func.coalesce(func.sum(balance_expr), ZERO).label("total_overdue"),
+            func.count(Invoice.id).label("total_count")
+        )
+        .outerjoin(paid_sub, Invoice.id == paid_sub.c.invoice_id)
+        .filter(*base_filters)
+    )
+    totals_row = totals_query.first()
+    total_overdue = money(totals_row.total_overdue) if totals_row else ZERO
+    total_count = int(totals_row.total_count or 0) if totals_row else 0
 
-    for invoice, paid_amount in query.all():
-        balance = money(invoice.total_amount - paid_amount)
+    # 2. Database-level pagination with column projection (avoids full entity loading)
+    paged_query = (
+        db.query(
+            Invoice.id.label("invoice_id"),
+            Invoice.invoice_number.label("invoice_number"),
+            Invoice.customer_id.label("customer_id"),
+            Invoice.subscription_id.label("subscription_id"),
+            Invoice.issue_date.label("issue_date"),
+            Invoice.due_date.label("due_date"),
+            Invoice.total_amount.label("invoice_total"),
+            func.coalesce(paid_sub.c.paid_amount, ZERO).label("paid_amount"),
+            balance_expr.label("outstanding_balance")
+        )
+        .outerjoin(paid_sub, Invoice.id == paid_sub.c.invoice_id)
+        .filter(*base_filters)
+        .order_by(Invoice.due_date.asc())
+        .offset(skip)
+        .limit(limit)
+    )
 
-        if balance <= 0:
-            continue
+    rows = paged_query.all()
 
-        total_overdue += balance
-
-        results.append({
-            "invoice_id": invoice.id,
-            "invoice_number": invoice.invoice_number,
-            "customer_id": invoice.customer_id,
-            "subscription_id": invoice.subscription_id,
-            "issue_date": str(invoice.issue_date),
-            "due_date": str(invoice.due_date),
-            "invoice_total": str(money(invoice.total_amount)),
-            "paid_amount": str(money(paid_amount)),
-            "outstanding_balance": str(balance),
-        })
+    invoices_list = [
+        {
+            "invoice_id": r.invoice_id,
+            "invoice_number": r.invoice_number,
+            "customer_id": r.customer_id,
+            "subscription_id": r.subscription_id,
+            "issue_date": str(r.issue_date),
+            "due_date": str(r.due_date),
+            "invoice_total": str(money(r.invoice_total)),
+            "paid_amount": str(money(r.paid_amount)),
+            "outstanding_balance": str(money(r.outstanding_balance)),
+        }
+        for r in rows
+    ]
 
     return {
-        "total_overdue_amount": str(money(total_overdue)),
-        "total_overdue_invoices": len(results),
+        "total_overdue_amount": str(total_overdue),
+        "total_overdue_invoices": total_count,
         "skip": skip,
         "limit": limit,
-        "invoices": results[skip:skip + limit],
+        "invoices": invoices_list,
     }

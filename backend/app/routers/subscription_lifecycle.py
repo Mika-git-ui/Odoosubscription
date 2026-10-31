@@ -1,5 +1,6 @@
 
-from fastapi import APIRouter, Depends, HTTPException
+from datetime import date
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -21,6 +22,51 @@ def get_subscription_or_404(subscription_id: int, db: Session):
         raise HTTPException(404, "Subscription not found")
 
     return subscription
+
+
+def process_auto_close_expired_subscriptions(db: Session, target_date: date | None = None) -> dict:
+    today = target_date or date.today()
+
+    eligible_subs = (
+        db.query(Subscription)
+        .join(Plan, Subscription.plan_id == Plan.id)
+        .filter(
+            Subscription.status.in_(["active", "confirmed"]),
+            Subscription.expiry_date.isnot(None),
+            Subscription.expiry_date < today,
+            Plan.allow_auto_close.is_(True)
+        )
+        .all()
+    )
+
+    closed_subscriptions = []
+    for sub in eligible_subs:
+        sub.status = "closed"
+        sub.is_paused = False
+        closed_subscriptions.append({
+            "id": sub.id,
+            "subscription_number": sub.subscription_number,
+            "expiry_date": str(sub.expiry_date)
+        })
+
+    db.commit()
+
+    return {
+        "message": "Auto-closure of expired subscriptions completed",
+        "target_date": str(today),
+        "total_closed": len(closed_subscriptions),
+        "closed_subscriptions": closed_subscriptions
+    }
+
+
+@router.post("/auto-close-expired")
+def auto_close_expired(
+    target_date: date | None = Query(default=None),
+    db: Session = Depends(get_db),
+    current_user=Depends(require_roles("admin", "staff"))
+):
+    return process_auto_close_expired_subscriptions(db=db, target_date=target_date)
+
 
 
 @router.patch("/{subscription_id}/status")

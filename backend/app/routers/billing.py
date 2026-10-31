@@ -5,7 +5,7 @@ import calendar
 from datetime import date, timedelta
 from decimal import Decimal, ROUND_HALF_UP
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy import func
@@ -25,6 +25,8 @@ from app.models.entities import (
     DiscountUsage,
 )
 from app.routers.auth import get_current_user, require_roles
+from app.core.pdf_service import generate_invoice_pdf
+from app.core.email_service import send_invoice_email
 
 
 router = APIRouter(prefix="/billing", tags=["Billing"])
@@ -109,65 +111,84 @@ def get_total_paid(invoice_id, db):
     return money(result)
 
 
-def calculate_discount(subtotal, total_quantity, db):
+def check_discount_eligibility(discount, subtotal, total_quantity, invoice_items=None, today=None):
+    today = today or date.today()
+    if not discount.is_active:
+        return False, "Discount is inactive", ZERO
+
+    if discount.start_date and today < discount.start_date:
+        return False, f"Discount is not active yet (starts on {discount.start_date})", ZERO
+
+    if discount.end_date and today > discount.end_date:
+        return False, f"Discount has expired (ended on {discount.end_date})", ZERO
+
+    if discount.maximum_uses is not None and (discount.current_uses or 0) >= discount.maximum_uses:
+        return False, "Discount maximum usage limit reached", ZERO
+
+    if discount.applicable_to == "product":
+        if not invoice_items:
+            return False, "Cannot evaluate product-specific discount without invoice items", ZERO
+        product_lines = [item for item in invoice_items if item.get("product_id") == discount.product_id]
+        if not product_lines:
+            return False, f"Discount applies only to product ID {discount.product_id}, which is not present in subscription", ZERO
+        prod_subtotal = sum((item["subtotal"] for item in product_lines), ZERO)
+        prod_qty = sum((item["quantity"] for item in product_lines), 0)
+        if prod_subtotal < money(discount.minimum_purchase):
+            return False, f"Minimum purchase amount of {discount.minimum_purchase} for product not met", ZERO
+        if prod_qty < (discount.minimum_quantity or 1):
+            return False, f"Minimum quantity of {discount.minimum_quantity} for product not met", ZERO
+        dtype = discount.discount_type.lower()
+        if dtype == "percentage":
+            amount = money(prod_subtotal * money(discount.value) / Decimal("100"))
+        elif dtype == "fixed":
+            amount = money(discount.value)
+        else:
+            return False, f"Unsupported discount type {discount.discount_type}", ZERO
+        amount = min(amount, prod_subtotal)
+        return True, "Eligible", amount
+
+    # Subscription-wide discount
+    if subtotal < money(discount.minimum_purchase):
+        return False, f"Minimum purchase amount of {discount.minimum_purchase} not met", ZERO
+    if total_quantity < (discount.minimum_quantity or 1):
+        return False, f"Minimum quantity of {discount.minimum_quantity} not met", ZERO
+    dtype = discount.discount_type.lower()
+    if dtype == "percentage":
+        amount = money(subtotal * money(discount.value) / Decimal("100"))
+    elif dtype == "fixed":
+        amount = money(discount.value)
+    else:
+        return False, f"Unsupported discount type {discount.discount_type}", ZERO
+    amount = min(amount, subtotal)
+    return True, "Eligible", amount
+
+
+def calculate_discount(subtotal, total_quantity, db, invoice_items=None, today=None):
     """
     Returns the first eligible discount and its amount.
     Only one discount is applied per invoice.
     """
-
     discounts = db.query(Discount).filter(
         Discount.is_active == True
     ).order_by(Discount.id.asc()).all()
 
-    today = date.today()
-
     for discount in discounts:
-
-        if discount.start_date and today < discount.start_date:
-            continue
-
-        if discount.end_date and today > discount.end_date:
-            continue
-
-        if subtotal < money(discount.minimum_purchase):
-            continue
-
-        if total_quantity < (discount.minimum_quantity or 1):
-            continue
-
-        if (
-            discount.maximum_uses is not None
-            and (discount.current_uses or 0) >= discount.maximum_uses
-        ):
-            continue
-
-        discount_type = discount.discount_type.lower()
-
-        if discount_type == "percentage":
-            amount = subtotal * money(discount.value) / Decimal("100")
-
-        elif discount_type == "fixed":
-            amount = money(discount.value)
-
-        else:
-            continue
-
-        amount = min(money(amount), subtotal)
-
-        if amount > ZERO:
+        eligible, reason, amount = check_discount_eligibility(
+            discount, subtotal, total_quantity, invoice_items=invoice_items, today=today
+        )
+        if eligible and amount > ZERO:
             return discount, amount
 
     return None, ZERO
 
 
-# GENERATE INVOICE: ADMIN AND STAFF
-
-@router.post("/generate/{subscription_id}")
-def generate_invoice(
+def generate_invoice_for_subscription(
     subscription_id: int,
-    db: Session = Depends(get_db),
-    current_user=Depends(require_roles("admin", "staff"))
-):
+    db: Session,
+    discount_id: int | None = None,
+    target_date: date | None = None
+) -> dict:
+    today = target_date or date.today()
     subscription = db.query(Subscription).filter(
         Subscription.id == subscription_id
     ).with_for_update().first()
@@ -180,7 +201,7 @@ def generate_invoice(
 
     billing_date = subscription.next_billing_date or subscription.start_date
 
-    if billing_date > date.today():
+    if billing_date > today:
         raise HTTPException(400, "Billing date has not arrived")
 
     if subscription.expiry_date and billing_date > subscription.expiry_date:
@@ -213,25 +234,7 @@ def generate_invoice(
         )
 
     try:
-        invoice = Invoice(
-            invoice_number=f"INV-{uuid.uuid4().hex[:10].upper()}",
-            subscription_id=subscription.id,
-            customer_id=subscription.customer_id,
-            billing_period_start=billing_date,
-            billing_period_end=period_end,
-            issue_date=date.today(),
-            due_date=date.today() + timedelta(days=15),
-            subtotal=ZERO,
-            tax_amount=ZERO,
-            discount_amount=ZERO,
-            total_amount=ZERO,
-            status="draft",
-        )
-
-        db.add(invoice)
-        db.flush()
-
-        # Calculate subtotal and quantity.
+        # Calculate subtotal and quantity
         subtotal = ZERO
         total_quantity = 0
         invoice_items = []
@@ -248,11 +251,11 @@ def generate_invoice(
                 )
 
             amount = money(line.unit_price * line.quantity)
-
             subtotal += amount
             total_quantity += line.quantity
 
             invoice_items.append({
+                "product_id": product.id,
                 "product_name": product.name,
                 "quantity": line.quantity,
                 "unit_price": money(line.unit_price),
@@ -261,7 +264,7 @@ def generate_invoice(
 
         subtotal = money(subtotal)
 
-        # Combine all active tax rates.
+        # Combine active tax rates
         tax_rules = db.query(TaxRule).filter(
             TaxRule.is_active == True
         ).all()
@@ -271,45 +274,76 @@ def generate_invoice(
             ZERO
         )
 
-        # Find one eligible discount.
-        discount, discount_amount = calculate_discount(
-            subtotal,
-            total_quantity,
-            db
-        )
+        # Discount resolution
+        discount = None
+        discount_amount = ZERO
+        if discount_id is not None:
+            discount = db.query(Discount).filter(Discount.id == discount_id).with_for_update().first()
+            if not discount:
+                raise HTTPException(404, "Discount not found")
+            eligible, reason, discount_amount = check_discount_eligibility(
+                discount, subtotal, total_quantity, invoice_items=invoice_items, today=today
+            )
+            if not eligible:
+                raise HTTPException(400, f"Discount cannot be applied: {reason}")
+        else:
+            discount, discount_amount = calculate_discount(
+                subtotal, total_quantity, db, invoice_items=invoice_items, today=today
+            )
+            if discount:
+                discount = db.query(Discount).filter(Discount.id == discount.id).with_for_update().first()
+                eligible, reason, discount_amount = check_discount_eligibility(
+                    discount, subtotal, total_quantity, invoice_items=invoice_items, today=today
+                )
+                if not eligible or discount_amount <= ZERO:
+                    discount = None
+                    discount_amount = ZERO
 
         taxable_subtotal = money(subtotal - discount_amount)
 
-        # Distribute the discount proportionally across invoice lines.
+        invoice = Invoice(
+            invoice_number=f"INV-{uuid.uuid4().hex[:10].upper()}",
+            subscription_id=subscription.id,
+            customer_id=subscription.customer_id,
+            billing_period_start=billing_date,
+            billing_period_end=period_end,
+            issue_date=today,
+            due_date=today + timedelta(days=15),
+            subtotal=subtotal,
+            tax_amount=ZERO,
+            discount_amount=discount_amount,
+            total_amount=ZERO,
+            status="draft",
+        )
+        db.add(invoice)
+        db.flush()
+
         total_tax = ZERO
         total_discount_distributed = ZERO
 
-        for index, item in enumerate(invoice_items):
+        if discount and discount.applicable_to == "product":
+            applicable_lines = [item for item in invoice_items if item.get("product_id") == discount.product_id]
+            applicable_subtotal = sum((item["subtotal"] for item in applicable_lines), ZERO)
+        else:
+            applicable_lines = invoice_items
+            applicable_subtotal = subtotal
 
-            if index == len(invoice_items) - 1:
-                line_discount = money(
-                    discount_amount - total_discount_distributed
-                )
-            elif subtotal > ZERO:
-                line_discount = money(
-                    discount_amount * item["subtotal"] / subtotal
-                )
-                total_discount_distributed += line_discount
-            else:
+        for item in invoice_items:
+            is_applicable = (not discount) or (discount.applicable_to != "product") or (item.get("product_id") == discount.product_id)
+
+            if not is_applicable or applicable_subtotal == ZERO or discount_amount == ZERO:
                 line_discount = ZERO
+            else:
+                is_last_applicable = (item == applicable_lines[-1])
+                if is_last_applicable:
+                    line_discount = money(discount_amount - total_discount_distributed)
+                else:
+                    line_discount = money(discount_amount * item["subtotal"] / applicable_subtotal)
+                    total_discount_distributed += line_discount
 
-            taxable_line_amount = money(
-                item["subtotal"] - line_discount
-            )
-
-            line_tax = money(
-                taxable_line_amount
-                * combined_tax_rate
-                / Decimal("100")
-            )
-
+            taxable_line_amount = money(item["subtotal"] - line_discount)
+            line_tax = money(taxable_line_amount * combined_tax_rate / Decimal("100"))
             line_total = money(taxable_line_amount + line_tax)
-
             total_tax += line_tax
 
             db.add(InvoiceLine(
@@ -326,19 +360,15 @@ def generate_invoice(
         total_tax = money(total_tax)
         total_amount = money(taxable_subtotal + total_tax)
 
-        invoice.subtotal = subtotal
         invoice.tax_amount = total_tax
-        invoice.discount_amount = discount_amount
         invoice.total_amount = total_amount
 
-        # Record discount usage only when a discount was applied.
-        if discount:
+        if discount and discount_amount > ZERO:
             db.add(DiscountUsage(
                 discount_id=discount.id,
                 invoice_id=invoice.id,
                 amount_saved=discount_amount,
             ))
-
             discount.current_uses = (discount.current_uses or 0) + 1
 
         subscription.next_billing_date = next_date
@@ -364,7 +394,6 @@ def generate_invoice(
 
     except IntegrityError as exc:
         db.rollback()
-
         existing = db.query(Invoice).filter(
             Invoice.subscription_id == subscription_id,
             Invoice.billing_period_start == billing_date,
@@ -383,6 +412,90 @@ def generate_invoice(
     except Exception:
         db.rollback()
         raise
+
+
+# GENERATE INVOICE: ADMIN AND STAFF
+@router.post("/generate/{subscription_id}")
+def generate_invoice(
+    subscription_id: int,
+    discount_id: int | None = Query(default=None),
+    db: Session = Depends(get_db),
+    current_user=Depends(require_roles("admin", "staff"))
+):
+    return generate_invoice_for_subscription(
+        subscription_id=subscription_id,
+        db=db,
+        discount_id=discount_id
+    )
+
+
+# BATCH GENERATE INVOICES: ADMIN AND STAFF
+@router.post("/batch-generate")
+def batch_generate_invoices(
+    target_date: date | None = Query(default=None),
+    db: Session = Depends(get_db),
+    current_user=Depends(require_roles("admin", "staff"))
+):
+    today = target_date or date.today()
+
+    eligible_subs = db.query(Subscription).filter(
+        Subscription.status == "active",
+        Subscription.is_paused.is_(False),
+        func.coalesce(Subscription.next_billing_date, Subscription.start_date) <= today
+    ).order_by(Subscription.id.asc()).all()
+
+    successful_invoices = []
+    failed_subscriptions = []
+
+    for sub in eligible_subs:
+        sub_id = sub.id
+        sub_num = sub.subscription_number
+        try:
+            iterations = 0
+            while iterations < 24:
+                cur_sub = db.query(Subscription).filter(Subscription.id == sub_id).first()
+                if not cur_sub or cur_sub.status != "active" or cur_sub.is_paused:
+                    break
+                billing_date = cur_sub.next_billing_date or cur_sub.start_date
+                if billing_date > today:
+                    break
+                if cur_sub.expiry_date and billing_date > cur_sub.expiry_date:
+                    break
+
+                result = generate_invoice_for_subscription(
+                    subscription_id=sub_id,
+                    db=db,
+                    target_date=today
+                )
+                successful_invoices.append(result)
+                iterations += 1
+
+        except HTTPException as he:
+            db.rollback()
+            failed_subscriptions.append({
+                "subscription_id": sub_id,
+                "subscription_number": sub_num,
+                "error": he.detail,
+                "status_code": he.status_code
+            })
+        except Exception as exc:
+            db.rollback()
+            failed_subscriptions.append({
+                "subscription_id": sub_id,
+                "subscription_number": sub_num,
+                "error": str(exc),
+                "status_code": 500
+            })
+
+    return {
+        "message": "Batch billing completed",
+        "target_date": str(today),
+        "total_eligible_subscriptions": len(eligible_subs),
+        "invoices_generated_count": len(successful_invoices),
+        "failed_subscriptions_count": len(failed_subscriptions),
+        "successful_invoices": successful_invoices,
+        "failed_subscriptions": failed_subscriptions
+    }
 
 
 # LIST INVOICES
@@ -579,3 +692,59 @@ def cancel_invoice(
         "invoice_id": invoice.id,
         "status": invoice.status
     }
+
+
+# INVOICE PDF GENERATION
+@router.get("/invoices/{invoice_id}/pdf")
+def get_invoice_pdf(
+    invoice_id: int,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user)
+):
+    invoice = get_invoice_or_404(invoice_id, db)
+    ensure_invoice_access(invoice, current_user, db)
+
+    customer = db.query(Customer).filter(Customer.id == invoice.customer_id).first()
+    subscription = db.query(Subscription).filter(Subscription.id == invoice.subscription_id).first()
+    payments = db.query(Payment).filter(Payment.invoice_id == invoice.id).all()
+    lines = invoice.lines
+
+    pdf_bytes = generate_invoice_pdf(invoice, customer, subscription, payments, lines)
+
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f'inline; filename="{invoice.invoice_number}.pdf"'
+        }
+    )
+
+
+# INVOICE EMAIL SENDING
+@router.post("/invoices/{invoice_id}/send-email")
+def email_invoice(
+    invoice_id: int,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user)
+):
+    invoice = get_invoice_or_404(invoice_id, db)
+    ensure_invoice_access(invoice, current_user, db)
+
+    customer = db.query(Customer).filter(Customer.id == invoice.customer_id).first()
+    if not customer or not customer.email:
+        raise HTTPException(400, "Customer does not have a registered email address")
+
+    subscription = db.query(Subscription).filter(Subscription.id == invoice.subscription_id).first()
+    payments = db.query(Payment).filter(Payment.invoice_id == invoice.id).all()
+    lines = invoice.lines
+
+    pdf_bytes = generate_invoice_pdf(invoice, customer, subscription, payments, lines)
+
+    send_invoice_email(invoice, customer, subscription, pdf_bytes=pdf_bytes)
+
+    return {
+        "message": "Invoice email sent successfully",
+        "invoice_number": invoice.invoice_number,
+        "recipient": customer.email
+    }
+
