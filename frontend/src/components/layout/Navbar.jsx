@@ -2,8 +2,6 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Menu,
-  Bell,
-  User,
   Shield,
   Sun,
   Moon,
@@ -15,6 +13,7 @@ import {
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
 import Dropdown from '../common/Dropdown';
+import RevoraLogo from '../common/RevoraLogo';
 
 export const Navbar = ({ onToggleSidebar }) => {
   const { user, logout } = useAuth();
@@ -107,12 +106,13 @@ export const Navbar = ({ onToggleSidebar }) => {
         )}
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <RevoraLogo size={22} />
           <span style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--text-main)' }}>
-            Brightloop Platform
+            Revora Platform
           </span>
           <span style={{ color: 'var(--border-strong)' }}>/</span>
           <span style={{ fontSize: '0.8125rem', color: 'var(--text-muted)' }}>
-            Python Masterclass Billing
+            Subscription & Masterclass Billing
           </span>
         </div>
       </div>
@@ -156,36 +156,6 @@ export const Navbar = ({ onToggleSidebar }) => {
           title={isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
         >
           {isDark ? <Sun size={17} /> : <Moon size={17} />}
-        </button>
-
-        {/* Notifications Icon */}
-        <button
-          type="button"
-          style={{
-            background: 'none',
-            border: 'none',
-            color: 'var(--text-secondary)',
-            cursor: 'pointer',
-            padding: '6px',
-            borderRadius: '6px',
-            display: 'flex',
-            alignItems: 'center',
-            position: 'relative',
-          }}
-          title="Notifications"
-        >
-          <Bell size={17} />
-          <span
-            style={{
-              position: 'absolute',
-              top: '5px',
-              right: '5px',
-              width: '7px',
-              height: '7px',
-              borderRadius: '50%',
-              backgroundColor: '#7952CC',
-            }}
-          />
         </button>
 
         {/* User Profile Dropdown Menu */}

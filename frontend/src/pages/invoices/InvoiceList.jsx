@@ -9,7 +9,8 @@ import StatusBadge from '../../components/common/StatusBadge';
 import { formatCurrency, formatDate } from '../../utils/formatters';
 import invoiceApi from '../../api/invoices';
 import paymentApi from '../../api/payments';
-import { Check, XCircle, CreditCard, Printer, FileText } from 'lucide-react';
+import { Check, XCircle, CreditCard, Printer, FileText, Download } from 'lucide-react';
+import { downloadInvoice } from '../../utils/invoiceDownloader';
 
 export const InvoiceList = () => {
   const [invoices, setInvoices] = useState([]);
@@ -198,6 +199,7 @@ export const InvoiceList = () => {
                 Cancel
               </Button>
             )}
+            <Button variant="outline" size="sm" icon={Download} onClick={() => downloadInvoice(row)} title="Download Invoice">Download</Button>
             <Button variant="outline" size="sm" icon={FileText} onClick={() => handleViewInvoice(row.id)} title="View / Print">
               View
             </Button>
@@ -323,6 +325,7 @@ export const InvoiceList = () => {
             <Button variant="secondary" onClick={() => setDetailModalOpen(false)}>
               Close
             </Button>
+            <Button variant="primary" icon={Download} onClick={() => downloadInvoice(invoiceDetail)}>Download Invoice</Button>
             <Button variant="outline" icon={Printer} onClick={() => window.print()}>
               Print Invoice
             </Button>

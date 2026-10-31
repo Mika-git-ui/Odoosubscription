@@ -22,6 +22,7 @@ import SpotlightCard from '../../components/common/SpotlightCard';
 import Dropdown from '../../components/common/Dropdown';
 import invoiceApi from '../../api/invoices';
 import { formatCurrency } from '../../utils/formatters';
+import { downloadInvoice } from '../../utils/invoiceDownloader';
 
 export const AdminDashboard = () => {
   const navigate = useNavigate();
@@ -393,7 +394,7 @@ export const AdminDashboard = () => {
               }}
             >
               <Plus size={15} />
-              <span>+ New Invoice</span>
+              <span>New Invoice</span>
             </button>
 
             <Dropdown
@@ -477,14 +478,15 @@ export const AdminDashboard = () => {
                     >
                       <button
                         type="button"
+                        onClick={() => downloadInvoice(inv)}
                         style={{
                           background: 'none',
                           border: 'none',
-                          color: 'var(--text-secondary)',
+                          color: 'var(--primary)',
                           cursor: 'pointer',
                           padding: '4px',
                         }}
-                        title="Download Invoice PDF"
+                        title="Download Invoice PDF / Receipt"
                       >
                         <Download size={15} />
                       </button>
@@ -525,7 +527,7 @@ export const AdminDashboard = () => {
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <BookOpen size={18} color="var(--primary)" />
             <h3 style={{ fontSize: '0.9375rem', fontWeight: 600, color: 'var(--text-main)', margin: 0 }}>
-              Brightloop Python Masterclass — Active Curriculum Tiers
+              Revora Python Masterclass — Active Curriculum Tiers
             </h3>
           </div>
           <span

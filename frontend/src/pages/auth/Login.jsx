@@ -5,6 +5,7 @@ import { useTheme } from '../../context/ThemeContext';
 import { LogIn, Eye, EyeOff, Shield, Users, User, Sun, Moon } from 'lucide-react';
 import ErrorMessage from '../../components/common/ErrorMessage';
 import SpotlightCard from '../../components/common/SpotlightCard';
+import RevoraLogo from '../../components/common/RevoraLogo';
 
 export const Login = () => {
   const { login } = useAuth();
@@ -108,24 +109,7 @@ export const Login = () => {
       >
         {/* Revora Logo & Title */}
         <div style={{ textAlign: 'center', marginBottom: '1.75rem' }}>
-          <div
-            style={{
-              width: '44px',
-              height: '44px',
-              borderRadius: '10px',
-              background: 'linear-gradient(135deg, #7952CC 0%, #9F7AEA 100%)',
-              color: '#FFFFFF',
-              display: 'inline-flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontWeight: 800,
-              fontSize: '1.25rem',
-              marginBottom: '0.75rem',
-              boxShadow: '0 4px 12px rgba(121, 82, 204, 0.3)',
-            }}
-          >
-            R
-          </div>
+          <RevoraLogo size={48} style={{ marginBottom: '0.75rem' }} />
           <h1 style={{ fontSize: '1.5rem', fontWeight: 700, color: 'var(--text-main)', margin: 0, letterSpacing: '-0.02em' }}>
             Revora
           </h1>

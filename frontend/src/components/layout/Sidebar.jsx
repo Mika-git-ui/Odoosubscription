@@ -27,6 +27,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
+import RevoraLogo from '../common/RevoraLogo';
 
 const NAV_CONFIG = {
   ADMIN: [
@@ -96,7 +97,7 @@ export const Sidebar = ({
       <aside
         className={`sidebar-wrapper sidebar-desktop ${isOpen ? 'sidebar-mobile-open' : ''}`}
         style={{
-          width: isCollapsed ? '74px' : '250px',
+          width: isCollapsed ? '76px' : '250px',
           backgroundColor: 'var(--sidebar-bg)',
           color: 'var(--sidebar-text)',
           display: 'flex',
@@ -113,79 +114,95 @@ export const Sidebar = ({
         {/* Brand Header */}
         <div
           style={{
-            padding: isCollapsed ? '1.25rem 0.75rem' : '1.25rem 1.25rem 1rem',
+            padding: isCollapsed ? '1rem 0.5rem' : '1.25rem 1.25rem 1rem',
             display: 'flex',
             alignItems: 'center',
             justifyContent: isCollapsed ? 'center' : 'space-between',
             borderBottom: '1px solid rgba(255, 255, 255, 0.04)',
+            position: 'relative',
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          {isCollapsed ? (
             <div
               style={{
-                width: '32px',
-                height: '32px',
-                borderRadius: '8px',
-                background: 'linear-gradient(135deg, #7952CC 0%, #9F7AEA 100%)',
-                color: '#FFFFFF',
                 display: 'flex',
+                flexDirection: 'column',
                 alignItems: 'center',
-                justifyContent: 'center',
-                fontWeight: 800,
-                fontSize: '1rem',
-                boxShadow: '0 2px 8px rgba(121, 82, 204, 0.4)',
-                flexShrink: 0,
+                gap: '8px',
+                width: '100%',
               }}
             >
-              R
+              <RevoraLogo size={34} />
+              <button
+                type="button"
+                onClick={onToggleCollapse}
+                title="Expand sidebar"
+                style={{
+                  background: 'rgba(255,255,255,0.06)',
+                  border: '1px solid rgba(255,255,255,0.1)',
+                  color: '#9CA3AF',
+                  cursor: 'pointer',
+                  padding: '4px',
+                  borderRadius: '6px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <ChevronRight size={14} />
+              </button>
             </div>
-            {!isCollapsed && (
-              <div>
-                <h2
-                  style={{
-                    fontSize: '1rem',
-                    fontWeight: 700,
-                    color: '#FFFFFF',
-                    margin: 0,
-                    letterSpacing: '-0.01em',
-                  }}
-                >
-                  Revora
-                </h2>
-                <span
-                  style={{
-                    fontSize: '10px',
-                    color: '#6B7280',
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.05em',
-                  }}
-                >
-                  {currentRole} WORKSPACE
-                </span>
+          ) : (
+            <>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <RevoraLogo size={34} />
+                <div>
+                  <h2
+                    style={{
+                      fontSize: '1.05rem',
+                      fontWeight: 700,
+                      color: '#FFFFFF',
+                      margin: 0,
+                      letterSpacing: '-0.02em',
+                    }}
+                  >
+                    Revora
+                  </h2>
+                  <span
+                    style={{
+                      fontSize: '9.5px',
+                      color: '#6B7280',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.06em',
+                      fontWeight: 600,
+                    }}
+                  >
+                    {currentRole} WORKSPACE
+                  </span>
+                </div>
               </div>
-            )}
-          </div>
 
-          {/* Desktop Minimize/Expand Toggle Button */}
-          <button
-            type="button"
-            onClick={onToggleCollapse}
-            title={isCollapsed ? 'Expand sidebar' : 'Minimize sidebar'}
-            style={{
-              background: 'none',
-              border: 'none',
-              color: '#6B7280',
-              cursor: 'pointer',
-              padding: '4px',
-              borderRadius: '4px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
-            className="collapse-toggle-btn"
-          >
-            {isCollapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
-          </button>
+              {/* Desktop Minimize Toggle Button */}
+              <button
+                type="button"
+                onClick={onToggleCollapse}
+                title="Minimize sidebar"
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: '#6B7280',
+                  cursor: 'pointer',
+                  padding: '4px',
+                  borderRadius: '4px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <ChevronLeft size={16} />
+              </button>
+            </>
+          )}
 
           {/* Mobile Close Button */}
           {onClose && (
@@ -239,15 +256,15 @@ export const Sidebar = ({
           </div>
         )}
 
-        {/* Navigation Items */}
+        {/* Navigation Items (Properly centered & visible in both states) */}
         <nav
           style={{
             flex: 1,
             overflowY: 'auto',
-            padding: isCollapsed ? '0.5rem 0.4rem' : '0.25rem 0.75rem',
+            padding: isCollapsed ? '0.5rem 0.35rem' : '0.25rem 0.75rem',
             display: 'flex',
             flexDirection: 'column',
-            gap: '2px',
+            gap: isCollapsed ? '4px' : '2px',
           }}
         >
           {filteredItems.map((item) => {
@@ -257,27 +274,40 @@ export const Sidebar = ({
                 key={item.path}
                 to={item.path}
                 onClick={onClose}
-                title={isCollapsed ? item.label : undefined}
+                title={item.label}
                 style={({ isActive }) => ({
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: isCollapsed ? 'center' : 'flex-start',
                   gap: isCollapsed ? '0' : '10px',
-                  padding: isCollapsed ? '0.65rem' : '0.55rem 0.75rem',
-                  borderRadius: '6px',
+                  width: isCollapsed ? '46px' : 'auto',
+                  height: isCollapsed ? '44px' : 'auto',
+                  margin: isCollapsed ? '0 auto' : '0',
+                  padding: isCollapsed ? '0' : '0.55rem 0.75rem',
+                  borderRadius: isCollapsed ? '8px' : '6px',
                   fontSize: '0.8125rem',
                   fontWeight: isActive ? 600 : 500,
                   color: isActive ? '#FFFFFF' : '#9CA3AF',
-                  backgroundColor: isActive ? '#1F2937' : 'transparent',
+                  backgroundColor: isActive
+                    ? isCollapsed
+                      ? 'rgba(121, 82, 204, 0.25)'
+                      : '#1F2937'
+                    : 'transparent',
+                  border:
+                    isActive && isCollapsed
+                      ? '1px solid rgba(121, 82, 204, 0.4)'
+                      : '1px solid transparent',
                   borderLeft:
                     isActive && !isCollapsed
                       ? '3px solid #7952CC'
-                      : '3px solid transparent',
+                      : !isCollapsed
+                      ? '3px solid transparent'
+                      : 'none',
                   transition: 'all 120ms ease-in-out',
                   textDecoration: 'none',
                 })}
               >
-                <Icon size={17} color="inherit" style={{ flexShrink: 0 }} />
+                <Icon size={isCollapsed ? 20 : 17} color="inherit" style={{ flexShrink: 0 }} />
                 {!isCollapsed && (
                   <span
                     style={{
@@ -297,7 +327,7 @@ export const Sidebar = ({
         {/* Bottom Area: Dynamic Light / Dark Mode Toggle Pill & Sign Out */}
         <div
           style={{
-            padding: isCollapsed ? '0.75rem 0.4rem' : '0.85rem 1rem',
+            padding: isCollapsed ? '0.75rem 0.35rem' : '0.85rem 1rem',
             borderTop: '1px solid #1F2937',
             display: 'flex',
             flexDirection: 'column',
@@ -336,21 +366,21 @@ export const Sidebar = ({
 
             <div
               style={{
-                width: isCollapsed ? '24px' : '36px',
-                height: isCollapsed ? '24px' : '18px',
+                width: isCollapsed ? '28px' : '36px',
+                height: isCollapsed ? '28px' : '18px',
                 backgroundColor: '#374151',
                 borderRadius: '9999px',
                 position: 'relative',
                 display: 'flex',
                 alignItems: 'center',
-                justifyContent: isCollapsed ? 'center' : 'flex-start',
+                justifyContent: 'center',
                 padding: '2px',
               }}
             >
               <div
                 style={{
-                  width: '14px',
-                  height: '14px',
+                  width: isCollapsed ? '22px' : '14px',
+                  height: isCollapsed ? '22px' : '14px',
                   borderRadius: '50%',
                   backgroundColor: '#7952CC',
                   transform:
@@ -365,7 +395,7 @@ export const Sidebar = ({
                   justifyContent: 'center',
                 }}
               >
-                {isDark ? <Moon size={8} color="#FFF" /> : <Sun size={8} color="#FFF" />}
+                {isDark ? <Moon size={isCollapsed ? 12 : 8} color="#FFF" /> : <Sun size={isCollapsed ? 12 : 8} color="#FFF" />}
               </div>
             </div>
 
@@ -402,15 +432,15 @@ export const Sidebar = ({
             >
               <div
                 style={{
-                  width: '28px',
-                  height: '28px',
+                  width: '32px',
+                  height: '32px',
                   borderRadius: '50%',
                   backgroundColor: '#374151',
                   color: '#E5E7EB',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  fontSize: '11px',
+                  fontSize: '12px',
                   fontWeight: 600,
                   flexShrink: 0,
                 }}
