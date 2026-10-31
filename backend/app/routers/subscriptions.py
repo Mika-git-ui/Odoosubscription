@@ -1,3 +1,4 @@
+
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -16,14 +17,18 @@ from app.subscription_schemas import (
     SubscriptionCreate,
     SubscriptionResponse,
 )
+from app.routers.auth import get_current_user, require_roles
 
 router = APIRouter(prefix="/subscriptions", tags=["Subscriptions"])
 
+
+# CREATE SUBSCRIPTION: ADMIN AND STAFF ONLY
 
 @router.post("/", response_model=SubscriptionResponse)
 def create_subscription(
     data: SubscriptionCreate,
     db: Session = Depends(get_db),
+    current_user=Depends(require_roles("admin", "staff")),
 ):
     customer = db.query(Customer).filter(
         Customer.id == data.customer_id
@@ -75,7 +80,7 @@ def create_subscription(
         for item in data.lines:
             product = db.query(Product).filter(
                 Product.id == item.product_id,
-                Product.is_active == True,
+                Product.is_active.is_(True),
             ).first()
 
             if not product:
@@ -124,25 +129,49 @@ def create_subscription(
         raise
 
 
+# LIST SUBSCRIPTIONS
+# Admin/staff see all. Customers see only their own.
+
 @router.get("/", response_model=list[SubscriptionResponse])
 def list_subscriptions(
     skip: int = 0,
     limit: int = 50,
     db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
 ):
+    query = db.query(Subscription)
+
+    if current_user.role == "customer":
+        customer = db.query(Customer).filter(
+            Customer.user_id == current_user.id
+        ).first()
+
+        if not customer:
+            return []
+
+        query = query.filter(
+            Subscription.customer_id == customer.id
+        )
+
+    elif current_user.role not in ("admin", "staff"):
+        raise HTTPException(403, "Access denied")
+
     return (
-        db.query(Subscription)
-        .order_by(Subscription.id.desc())
+        query.order_by(Subscription.id.desc())
         .offset(skip)
         .limit(min(limit, 100))
         .all()
     )
 
 
+# GET ONE SUBSCRIPTION
+# Customers can only access their own subscription.
+
 @router.get("/{subscription_id}", response_model=SubscriptionResponse)
 def get_subscription(
     subscription_id: int,
     db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
 ):
     subscription = db.query(Subscription).filter(
         Subscription.id == subscription_id
@@ -150,5 +179,16 @@ def get_subscription(
 
     if not subscription:
         raise HTTPException(404, "Subscription not found")
+
+    if current_user.role == "customer":
+        customer = db.query(Customer).filter(
+            Customer.user_id == current_user.id
+        ).first()
+
+        if not customer or subscription.customer_id != customer.id:
+            raise HTTPException(403, "You cannot access this subscription")
+
+    elif current_user.role not in ("admin", "staff"):
+        raise HTTPException(403, "Access denied")
 
     return subscription

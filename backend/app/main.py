@@ -7,6 +7,8 @@ from app.routers.catalog import router as catalog_router
 from app.routers.subscriptions import router as subscription_router
 from app.routers.subscription_lifecycle import router as lifecycle_router
 from app.routers.billing import router as billing_router
+from app.routers.auth import router as auth_router
+from app.routers import reports
 
 app = FastAPI(title=settings.APP_NAME)
 
@@ -28,3 +30,5 @@ app.include_router(catalog_router)
 app.include_router(subscription_router)
 app.include_router(lifecycle_router)
 app.include_router(billing_router)
+app.include_router(auth_router)
+app.include_router(reports.router)

@@ -1,10 +1,10 @@
-from datetime import date
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models.entities import Subscription, Plan
+from app.routers.auth import require_roles
 
 router = APIRouter(
     prefix="/subscriptions",
@@ -12,18 +12,25 @@ router = APIRouter(
 )
 
 
-@router.patch("/{subscription_id}/status")
-def update_subscription_status(
-    subscription_id: int,
-    new_status: str,
-    db: Session = Depends(get_db),
-):
+def get_subscription_or_404(subscription_id: int, db: Session):
     subscription = db.query(Subscription).filter(
         Subscription.id == subscription_id
     ).first()
 
     if not subscription:
         raise HTTPException(404, "Subscription not found")
+
+    return subscription
+
+
+@router.patch("/{subscription_id}/status")
+def update_subscription_status(
+    subscription_id: int,
+    new_status: str,
+    db: Session = Depends(get_db),
+    current_user=Depends(require_roles("admin", "staff")),
+):
+    subscription = get_subscription_or_404(subscription_id, db)
 
     transitions = {
         "draft": ["quotation"],
@@ -40,7 +47,6 @@ def update_subscription_status(
         )
 
     subscription.status = new_status
-
     db.commit()
 
     return {
@@ -54,19 +60,15 @@ def update_subscription_status(
 def pause_subscription(
     subscription_id: int,
     db: Session = Depends(get_db),
+    current_user=Depends(require_roles("admin", "staff")),
 ):
-    subscription = db.query(Subscription).filter(
-        Subscription.id == subscription_id
-    ).first()
-
-    if not subscription:
-        raise HTTPException(404, "Subscription not found")
+    subscription = get_subscription_or_404(subscription_id, db)
 
     plan = db.query(Plan).filter(
         Plan.id == subscription.plan_id
     ).first()
 
-    if not plan.allow_pause:
+    if not plan or not plan.allow_pause:
         raise HTTPException(400, "This plan does not allow pausing")
 
     if subscription.status != "active":
@@ -85,13 +87,9 @@ def pause_subscription(
 def resume_subscription(
     subscription_id: int,
     db: Session = Depends(get_db),
+    current_user=Depends(require_roles("admin", "staff")),
 ):
-    subscription = db.query(Subscription).filter(
-        Subscription.id == subscription_id
-    ).first()
-
-    if not subscription:
-        raise HTTPException(404, "Subscription not found")
+    subscription = get_subscription_or_404(subscription_id, db)
 
     if not subscription.is_paused:
         raise HTTPException(400, "Subscription is not paused")
@@ -107,13 +105,9 @@ def close_subscription(
     subscription_id: int,
     db: Session = Depends(get_db),
     early: bool = False,
+    current_user=Depends(require_roles("admin", "staff")),
 ):
-    subscription = db.query(Subscription).filter(
-        Subscription.id == subscription_id
-    ).first()
-
-    if not subscription:
-        raise HTTPException(404, "Subscription not found")
+    subscription = get_subscription_or_404(subscription_id, db)
 
     plan = db.query(Plan).filter(
         Plan.id == subscription.plan_id
@@ -122,7 +116,7 @@ def close_subscription(
     if subscription.status not in ["confirmed", "active"]:
         raise HTTPException(400, "Subscription cannot be closed")
 
-    if early and not plan.allow_early_close:
+    if early and (not plan or not plan.allow_early_close):
         raise HTTPException(400, "Early closure is not allowed for this plan")
 
     subscription.status = "closed"

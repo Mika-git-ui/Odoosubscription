@@ -9,12 +9,19 @@ from app.schemas import (
     ProductCreate, ProductResponse,
     PlanCreate, PlanResponse
 )
+from app.routers.auth import get_current_user, require_roles
 
 router = APIRouter()
 
 
+# CUSTOMERS
+
 @router.post("/customers/", response_model=CustomerResponse)
-def create_customer(data: CustomerCreate, db: Session = Depends(get_db)):
+def create_customer(
+    data: CustomerCreate,
+    db: Session = Depends(get_db),
+    current_user=Depends(require_roles("admin", "staff"))
+):
     if db.query(Customer).filter(Customer.email == data.email).first():
         raise HTTPException(status_code=409, detail="Customer email already exists")
 
@@ -26,12 +33,23 @@ def create_customer(data: CustomerCreate, db: Session = Depends(get_db)):
 
 
 @router.get("/customers/", response_model=list[CustomerResponse])
-def list_customers(skip: int = 0, limit: int = 50, db: Session = Depends(get_db)):
+def list_customers(
+    skip: int = 0,
+    limit: int = 50,
+    db: Session = Depends(get_db),
+    current_user=Depends(require_roles("admin", "staff"))
+):
     return db.query(Customer).offset(skip).limit(min(limit, 100)).all()
 
 
+# PRODUCTS
+
 @router.post("/products/", response_model=ProductResponse)
-def create_product(data: ProductCreate, db: Session = Depends(get_db)):
+def create_product(
+    data: ProductCreate,
+    db: Session = Depends(get_db),
+    current_user=Depends(require_roles("admin", "staff"))
+):
     product = Product(**data.model_dump())
     db.add(product)
     db.commit()
@@ -40,12 +58,21 @@ def create_product(data: ProductCreate, db: Session = Depends(get_db)):
 
 
 @router.get("/products/", response_model=list[ProductResponse])
-def list_products(db: Session = Depends(get_db)):
-    return db.query(Product).filter(Product.is_active == True).all()
+def list_products(
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user)
+):
+    return db.query(Product).filter(Product.is_active.is_(True)).all()
 
+
+# PLANS
 
 @router.post("/plans/", response_model=PlanResponse)
-def create_plan(data: PlanCreate, db: Session = Depends(get_db)):
+def create_plan(
+    data: PlanCreate,
+    db: Session = Depends(get_db),
+    current_user=Depends(require_roles("admin", "staff"))
+):
     allowed = {"daily", "weekly", "monthly", "yearly"}
 
     if data.billing_interval not in allowed:
@@ -63,5 +90,8 @@ def create_plan(data: PlanCreate, db: Session = Depends(get_db)):
 
 
 @router.get("/plans/", response_model=list[PlanResponse])
-def list_plans(db: Session = Depends(get_db)):
-    return db.query(Plan).filter(Plan.is_active == True).all()
+def list_plans(
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user)
+):
+    return db.query(Plan).filter(Plan.is_active.is_(True)).all()
