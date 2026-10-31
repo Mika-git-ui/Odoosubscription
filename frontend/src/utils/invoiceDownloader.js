@@ -272,3 +272,4 @@ export const downloadInvoice = (invoice) => {
 };
 
 export default downloadInvoice;
+
